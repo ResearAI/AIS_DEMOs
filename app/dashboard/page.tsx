@@ -7,7 +7,7 @@ import { ComputerView } from "@/components/computer-view"
 import { Terminal, AlertCircle, GitBranch, Activity, CheckCircle2, XCircle, Pause, Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { useTaskStream, Activity, FileStructureNode } from "@/lib/api" // Added Activity, FileStructureNode
+import { useTaskStream, Activity as ApiActivity, FileStructureNode } from "@/lib/api" // Aliased Activity type
 import { apiService } from "@/lib/api"
 
 // Define the message type
@@ -21,7 +21,7 @@ interface DialogMessage {
 interface HistorySnapshot {
   taskId: string | null; // taskId might be null initially if not available from searchParams
   promptText: string;
-  activities: Activity[];
+  activities: ApiActivity[]; // Updated to use aliased type
   currentFile: string;
   fileContent: string;
   terminalOutput: string[];
