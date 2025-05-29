@@ -10,26 +10,18 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useTaskStream, Activity as ApiActivity, FileStructureNode } from "@/lib/api" // Aliased Activity type
 import { apiService } from "@/lib/api"
 
-// Define the message type
-interface DialogMessage {
-  speaker: 'user' | 'ai';
-  text: string;
-  timestamp: Date;
-}
+// DialogMessage interface removed
 
-// Define History Snapshot type
+// Define History Snapshot type - dialogMessages field removed
 interface HistorySnapshot {
-  taskId: string | null; // taskId might be null initially if not available from searchParams
+  taskId: string | null; 
   promptText: string;
-  activities: ApiActivity[]; // Updated to use aliased type
+  activities: ApiActivity[]; // This will now hold combined AI and user messages
   currentFile: string;
   fileContent: string;
   terminalOutput: string[];
   fileStructure: FileStructureNode | null;
-  dialogMessages: DialogMessage[];
-  // Add other relevant states if needed, e.g., isPaused, taskStatus
-  // For simplicity, focusing on core content states first.
-  timestamp: number; // To identify snapshots
+  timestamp: number; 
 }
 
 function DashboardPageContent() {
@@ -38,50 +30,74 @@ function DashboardPageContent() {
   const promptText = searchParams?.get('prompt') || "AI任务执行中"
 
   const [isPaused, setIsPaused] = useState(false)
-  const [dialogMessages, setDialogMessages] = useState<DialogMessage[]>([]);
+  // dialogMessages state removed
+  const [displayedActivities, setDisplayedActivities] = useState<ApiActivity[]>([]); // New state for unified log
 
   // History State
   const [history, setHistory] = useState<HistorySnapshot[]>([]);
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState<number>(-1); // -1 means live
   const [isViewingHistory, setIsViewingHistory] = useState<boolean>(false);
 
-
-  const handleAddUserMessage = (text: string) => {
-    if (isViewingHistory) return; // Don't add messages if viewing history
-    setDialogMessages(prev => [...prev, { speaker: 'user', text, timestamp: new Date() }]);
-  };
-
   // useTaskStream hook
   const liveTaskState = useTaskStream(taskId);
 
-  // Snapshotting Logic
+  // Effect to merge liveTaskState.activities (AI) into displayedActivities
+  useEffect(() => {
+    if (isViewingHistory) return; // Don't merge if viewing history
+
+    setDisplayedActivities(prevDisplayed => {
+      const newAiActivities = liveTaskState.activities.filter(
+        aiActivity => !prevDisplayed.some(dispActivity => dispActivity.id === aiActivity.id && dispActivity.speaker !== 'user')
+      );
+      const combined = [...prevDisplayed, ...newAiActivities];
+      return combined.sort((a, b) => a.timestamp - b.timestamp);
+    });
+  }, [liveTaskState.activities, isViewingHistory]);
+
+
+  const handleAddUserMessage = (text: string) => {
+    if (isViewingHistory) return; 
+
+    const newUserActivity: ApiActivity = {
+      id: Date.now(), 
+      text: text,
+      type: 'user_input', 
+      timestamp: Math.floor(Date.now() / 1000), 
+      speaker: 'user',
+      status: 'completed' 
+    };
+    
+    setDisplayedActivities(prevDisplayed => {
+      const combined = [...prevDisplayed, newUserActivity];
+      return combined.sort((a, b) => a.timestamp - b.timestamp);
+    });
+  };
+
+
+  // Snapshotting Logic - uses displayedActivities
   useEffect(() => {
     if (isViewingHistory) {
-      return; // Don't capture new snapshots if currently viewing history
+      return; 
     }
 
     const newSnapshot: HistorySnapshot = {
       taskId,
-      promptText, // Assuming promptText from searchParams is static for the session
-      activities: liveTaskState.activities,
+      promptText,
+      activities: displayedActivities, // Use unified displayedActivities
       currentFile: liveTaskState.currentFile,
       fileContent: liveTaskState.fileContent,
       terminalOutput: liveTaskState.terminalOutput,
       fileStructure: liveTaskState.fileStructure,
-      dialogMessages,
       timestamp: Date.now()
     };
 
-    // Avoid adding duplicate snapshots if nothing significant changed
-    // This simple check might need to be more sophisticated
     if (history.length > 0) {
       const lastSnapshot = history[history.length - 1];
       if (
-        lastSnapshot.activities === newSnapshot.activities &&
+        lastSnapshot.activities === newSnapshot.activities && // Shallow compare, might need deep for robustness
         lastSnapshot.currentFile === newSnapshot.currentFile &&
         lastSnapshot.fileContent === newSnapshot.fileContent &&
         lastSnapshot.terminalOutput === newSnapshot.terminalOutput &&
-        lastSnapshot.dialogMessages === newSnapshot.dialogMessages &&
         lastSnapshot.fileStructure === newSnapshot.fileStructure
       ) {
         return;
@@ -90,32 +106,26 @@ function DashboardPageContent() {
     
     setHistory(prevHistory => {
       const updatedHistory = [...prevHistory, newSnapshot];
-      // Optional: Limit history size
-      // if (updatedHistory.length > 50) {
-      //   updatedHistory.shift(); 
-      // }
       return updatedHistory;
     });
-    // When a new snapshot is taken, we are effectively at the "live" end of this new history
-    setCurrentHistoryIndex(prevIdx => history.length); // history.length will be the index of the new item
+    setCurrentHistoryIndex(history.length); 
 
   }, [
-    liveTaskState.activities, 
+    displayedActivities, // Now depends on displayedActivities
     liveTaskState.currentFile, 
     liveTaskState.fileContent, 
     liveTaskState.terminalOutput, 
     liveTaskState.fileStructure, 
-    dialogMessages, 
     isViewingHistory, 
     taskId, 
     promptText,
-    history // Added history to dep array for length check, careful with this
+    history 
   ]);
 
   const handleHistoryChange = (newIndex: number) => {
-    if (newIndex === -1 || newIndex >= history.length) { // Go Live command
+    if (newIndex === -1 || newIndex >= history.length) { 
       setIsViewingHistory(false);
-      setCurrentHistoryIndex(history.length > 0 ? history.length -1 : -1); // Point to the latest actual snapshot or -1 if empty
+      setCurrentHistoryIndex(history.length > 0 ? history.length -1 : -1); 
     } else if (newIndex >= 0 && newIndex < history.length) {
       setCurrentHistoryIndex(newIndex);
       setIsViewingHistory(true);
@@ -125,16 +135,15 @@ function DashboardPageContent() {
   // Determine display state based on whether viewing history or live
   const displayState: HistorySnapshot = isViewingHistory && history[currentHistoryIndex]
     ? history[currentHistoryIndex]
-    : { // Construct live state object
+    : { 
         taskId,
         promptText,
-        activities: liveTaskState.activities,
+        activities: displayedActivities, // Use unified displayedActivities
         currentFile: liveTaskState.currentFile,
         fileContent: liveTaskState.fileContent,
         terminalOutput: liveTaskState.terminalOutput,
         fileStructure: liveTaskState.fileStructure,
-        dialogMessages,
-        timestamp: Date.now() // Live timestamp
+        timestamp: Date.now() 
       };
 
   // Diagnostic Log for displayState
@@ -299,11 +308,11 @@ function DashboardPageContent() {
           <DashboardContent
             activeTask={displayState.promptText} // Use displayState
             commandOutput={[]} // Assuming commandOutput is not part of history for now
-            activities={displayState.activities} // Use displayState
-            taskStatus={isViewingHistory ? 'history' : liveTaskState.taskStatus} // Adjust taskStatus display
+            activities={displayState.activities} // Pass unified activities
+            taskStatus={isViewingHistory ? 'history' : liveTaskState.taskStatus} 
             onAddUserMessage={handleAddUserMessage}
-            dialogMessages={displayState.dialogMessages} // Use displayState
-            isViewingHistory={isViewingHistory} // Pass down isViewingHistory
+            dialogMessages={displayState.activities.filter(a => a.speaker === 'user' || a.speaker === 'ai')} // Filter for dialog display, though now part of activities
+            isViewingHistory={isViewingHistory} 
           />
         </div>
 

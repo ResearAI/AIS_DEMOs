@@ -2,11 +2,12 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://ai-researcher.net:5000/api';
 
 export interface Activity {
-  id: number;
+  id: number; // Can be Date.now() for user messages, or server-provided ID for agent activities
   text: string;
-  type: string;
-  status: string;
-  timestamp: number;
+  type: string; // e.g., 'command', 'file', 'user_input', 'thinking'
+  timestamp: number; // Unix timestamp
+  speaker?: 'user' | 'agent'; // Default to 'agent' if undefined for existing AI activities
+  status?: string; // Optional: 'in-progress', 'completed', 'failed'
   command?: string;
   filename?: string;
   path?: string;
