@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react" // Removed useM
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent } from "@/components/ui/tabs" // TabsList and TabsTrigger will be removed
 import { Slider } from "@/components/ui/slider"
-import { Terminal, FileText, FolderTree, ChevronRight, ChevronDown, File, Folder, Info, X, Plus, ArrowLeft, ArrowRight, Save, RotateCcw, Eye, EyeOff, MessageCircle } from "lucide-react"
+import { Terminal, FileText, FolderTree, ChevronRight, ChevronDown, File, Folder, Info, X, Plus, ArrowLeft, ArrowRight, Save, RotateCcw, Eye, EyeOff } from "lucide-react" // Removed MessageCircle
 import { FileStructureNode } from "@/lib/api"
 import { marked } from 'marked'
 import Prism from 'prismjs';
@@ -32,7 +32,11 @@ interface ComputerViewProps {
   taskStatus?: string
   terminalOutput?: string[]
   fileStructure?: FileStructureNode | null
-  dialogMessages?: Array<{speaker: 'user' | 'ai', text: string, timestamp: Date}>; // Add new prop
+  // dialogMessages prop removed
+  isViewingHistory?: boolean;
+  historyLength?: number;
+  currentHistoryIndexValue?: number;
+  onHistoryChange?: (newIndex: number) => void;
 }
 
 export function ComputerView({
@@ -43,9 +47,13 @@ export function ComputerView({
   taskStatus = 'idle',
   terminalOutput = [],
   fileStructure = null,
-  dialogMessages = [] // Default to empty array
+  // dialogMessages prop removed from destructuring
+  isViewingHistory = false,
+  historyLength = 0,
+  currentHistoryIndexValue = -1,
+  onHistoryChange
 }: ComputerViewProps) {
-  const [selectedView, setSelectedView] = useState<string>('editing') // 'editing', 'terminal', 'info', 'chat'
+  const [selectedView, setSelectedView] = useState<string>('editing') // 'editing', 'terminal', 'info' - 'chat' removed
   const [fileTabs, setFileTabs] = useState<FileTab[]>([])
   const [activeFileId, setActiveFileId] = useState<string>('')
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['resear-pro-task']))
@@ -59,7 +67,7 @@ export function ComputerView({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const terminalInputRef = useRef<HTMLInputElement>(null);
   const terminalDisplayRef = useRef<HTMLDivElement>(null);
-  const chatDisplayRef = useRef<HTMLDivElement>(null); // Ref for chat display area
+  // chatDisplayRef removed
 
   const [terminalInputValue, setTerminalInputValue] = useState('');
   const [displayedTerminalOutput, setDisplayedTerminalOutput] = useState<string[]>([]);
@@ -120,12 +128,7 @@ export function ComputerView({
     }
   }, [displayedTerminalOutput, selectedView]);
 
-  // Effect for auto-scrolling chat
-  useEffect(() => {
-    if (selectedView === 'chat' && chatDisplayRef.current) {
-      chatDisplayRef.current.scrollTop = chatDisplayRef.current.scrollHeight;
-    }
-  }, [dialogMessages, selectedView]);
+  // Effect for auto-scrolling chat - REMOVED
 
   // Effect for auto-focusing terminal input
   useEffect(() => {
@@ -323,9 +326,9 @@ export function ComputerView({
             <textarea
               value={activeTab.content}
               onChange={(e) => handleFileContentChange(activeTab.id, e.target.value)}
-              className="w-full h-full outline-none resize-none text-sm font-mono text-slate-800 placeholder:text-slate-400 p-4 bg-white"
+              className="w-full h-full outline-none resize-none text-sm font-mono text-slate-800 placeholder:text-slate-500 p-4 bg-white"
               placeholder="Enter Markdown..."
-              readOnly={!isLive && taskStatus !== 'completed'}
+              readOnly={isViewingHistory || (!isLive && taskStatus !== 'completed')}
               style={{ lineHeight: '1.6' }}
             />
           </div>
@@ -363,29 +366,26 @@ export function ComputerView({
             // Container A: This will be the scrollable container
             <div 
               ref={scrollContainerRef}
-              className="flex-1 p-0 overflow-y-auto relative" // Changed overflow-hidden to overflow-y-auto
+              className="flex-1 p-0 overflow-y-auto relative bg-slate-800" // Added bg-slate-800, kept overflow-y-auto
               onScroll={() => {
                 if (textareaRef.current && scrollContainerRef.current) {
                   textareaRef.current.scrollTop = scrollContainerRef.current.scrollTop;
                 }
-                // if (preRef.current && scrollContainerRef.current) { // Not needed if pre is in normal flow
-                //   preRef.current.scrollTop = scrollContainerRef.current.scrollTop;
-                // }
               }}
             >
               <textarea
                 ref={textareaRef}
                 value={activeTab.content}
                 onChange={(e) => handleFileContentChange(activeTab.id, e.target.value)}
-                className="w-full h-full outline-none resize-none text-sm font-mono text-transparent bg-transparent caret-slate-800 p-4 absolute inset-0 z-10"
+                className="w-full h-full outline-none resize-none text-sm font-mono text-transparent bg-transparent caret-white p-4 absolute inset-0 z-10 overflow-hidden"
                 placeholder="Enter code..."
-                readOnly={!isLive && taskStatus !== 'completed'}
+                readOnly={isViewingHistory || (!isLive && taskStatus !== 'completed')}
                 style={{ lineHeight: '1.6' }}
                 spellCheck="false"
               />
               <pre 
                 ref={preRef}
-                className="w-full outline-none resize-none text-sm font-mono p-4 z-0" // Removed h-full, absolute, inset-0, overflow-auto
+                className="w-full outline-none resize-none text-sm font-mono p-4 z-0 bg-transparent" // Added bg-transparent
                 style={{ lineHeight: '1.6', margin: 0 }} 
                 aria-hidden="true"
               >
@@ -398,9 +398,9 @@ export function ComputerView({
               <textarea
                 value={activeTab.content}
                 onChange={(e) => handleFileContentChange(activeTab.id, e.target.value)}
-                className="w-full h-full outline-none resize-none text-sm font-mono text-slate-800 placeholder:text-slate-400 bg-white"
+                className="w-full h-full outline-none resize-none text-sm font-mono text-slate-800 placeholder:text-slate-500 bg-white"
                 placeholder="Empty file"
-                readOnly={!isLive && taskStatus !== 'completed'}
+                readOnly={isViewingHistory || (!isLive && taskStatus !== 'completed')}
                 style={{ lineHeight: '1.6' }}
               />
             </div>
@@ -512,16 +512,7 @@ export function ComputerView({
             <Info className="h-4 w-4" />
             Info
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={`h-full px-3 rounded-none text-sm flex items-center gap-1
-              ${selectedView === 'chat' ? 'bg-slate-200 text-slate-900' : 'text-slate-600 hover:bg-slate-200 hover:text-slate-800'}`}
-            onClick={() => setSelectedView('chat')}
-          >
-            <MessageCircle className="h-4 w-4" />
-            Chat
-          </Button>
+          {/* "Chat" Button Removed */}
 
           {/* Spacer */}
           <div className="flex-grow"></div>
@@ -542,7 +533,7 @@ export function ComputerView({
             size="sm" 
             className="ml-2 border-slate-300 hover:bg-slate-200 text-slate-700 flex items-center gap-1" 
             onClick={handleRevert}
-            disabled={!(activeTab && activeTab.hasChanges)}
+            disabled={isViewingHistory || !(activeTab && activeTab.hasChanges)}
           >
             <RotateCcw className="h-3.5 w-3.5" />
             Revert
@@ -600,6 +591,7 @@ export function ComputerView({
                   onKeyDown={handleTerminalInputKeyDown}
                   className="flex-1 bg-transparent text-slate-300 outline-none font-mono text-sm placeholder:text-slate-500"
                   placeholder="Type a command..."
+                  disabled={isViewingHistory}
                 />
               </div>
             </div>
@@ -665,35 +657,7 @@ export function ComputerView({
             </div>
           )}
 
-          {selectedView === 'chat' && (
-            <div ref={chatDisplayRef} className="h-full overflow-y-auto p-4 space-y-3">
-              {dialogMessages && dialogMessages.length > 0 ? (
-                dialogMessages.map((msg, index) => (
-                  <div 
-                    key={index} 
-                    className={`flex ${msg.speaker === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div 
-                      className={`max-w-[70%] p-3 rounded-lg text-sm ${
-                        msg.speaker === 'user' 
-                          ? 'bg-blue-500 text-white' 
-                          : 'bg-slate-200 text-slate-800'
-                      }`}
-                    >
-                      <p>{msg.text}</p>
-                      <p className={`text-xs mt-1 ${msg.speaker === 'user' ? 'text-blue-200' : 'text-slate-500'}`}>
-                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-slate-400 text-center py-8">
-                  No chat messages yet.
-                </div>
-              )}
-            </div>
-          )}
+          {/* Chat View Rendering Removed */}
         </div>
         
         {/* Dashboard Operations Area (remains at the bottom of the right panel) */}
@@ -703,25 +667,38 @@ export function ComputerView({
               variant="outline" 
               size="icon" 
               className="border-slate-300 hover:bg-slate-200"
-              onClick={() => console.log("Backward clicked")}
+              onClick={() => onHistoryChange?.(Math.max(0, (currentHistoryIndexValue ?? 0) - 1))}
+              disabled={historyLength === 0 || currentHistoryIndexValue === 0}
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <Slider
-              defaultValue={sliderValue}
-              onValueChange={setSliderValue}
-              max={100}
+              value={isViewingHistory ? [currentHistoryIndexValue ?? 0] : (historyLength > 0 ? [historyLength -1] : [0])}
+              max={historyLength > 0 ? historyLength - 1 : 0}
               step={1}
               className="flex-1"
+              onValueChange={value => onHistoryChange?.(value[0])}
+              disabled={historyLength === 0}
             />
             <Button 
               variant="outline" 
               size="icon" 
               className="border-slate-300 hover:bg-slate-200"
-              onClick={() => console.log("Forward clicked")}
+              onClick={() => onHistoryChange?.(Math.min(historyLength - 1, (currentHistoryIndexValue ?? -1) + 1))}
+              disabled={historyLength === 0 || !isViewingHistory || currentHistoryIndexValue === historyLength - 1}
             >
               <ArrowRight className="h-4 w-4" />
             </Button>
+            {isViewingHistory && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-2 border-blue-500 text-blue-600 hover:bg-blue-50"
+                onClick={() => onHistoryChange?.(-1)} 
+              >
+                Go Live
+              </Button>
+            )}
           </div>
         </div>
       </div>

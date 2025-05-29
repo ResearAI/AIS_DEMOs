@@ -11,20 +11,38 @@ interface DashboardContentProps {
   commandOutput: string[]
   activities: Activity[]
   taskStatus: string
-  onAddUserMessage: (text: string) => void; // Add new prop
+  onAddUserMessage: (text: string) => void;
+  dialogMessages?: Array<{speaker: 'user' | 'ai', text: string, timestamp: Date}>;
+  isViewingHistory?: boolean; // Add new prop
 }
 
-export function DashboardContent({ activeTask, commandOutput, activities, taskStatus, onAddUserMessage }: DashboardContentProps) {
-  const activitiesEndRef = useRef<HTMLDivElement>(null)
-  const [autoScroll, setAutoScroll] = useState(true)
-  const [userInput, setUserInput] = useState("")
+export function DashboardContent({ 
+  activeTask, 
+  commandOutput, 
+  activities, 
+  taskStatus, 
+  onAddUserMessage,
+  dialogMessages = [], // Default to empty array
+  isViewingHistory = false // Default to false
+}: DashboardContentProps) {
+  const activitiesEndRef = useRef<HTMLDivElement>(null);
+  const dialogDisplayRef = useRef<HTMLDivElement>(null); // Ref for dialog display
+  const [autoScroll, setAutoScroll] = useState(true);
+  const [userInput, setUserInput] = useState("");
 
-  // 自动滚动到底部
+  // Auto-scroll for Activity Log
   useEffect(() => {
     if (autoScroll && activitiesEndRef.current) {
-      activitiesEndRef.current.scrollIntoView({ behavior: "smooth" })
+      activitiesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [activities, autoScroll])
+  }, [activities, autoScroll]);
+
+  // Auto-scroll for Dialog Messages
+  useEffect(() => {
+    if (dialogDisplayRef.current) {
+      dialogDisplayRef.current.scrollTop = dialogDisplayRef.current.scrollHeight;
+    }
+  }, [dialogMessages]);
 
   const getActivityIcon = (type: string) => {
     const iconClass = "h-4 w-4"
@@ -101,96 +119,126 @@ export function DashboardContent({ activeTask, commandOutput, activities, taskSt
         </div>
       </div>
 
-      {/* 活动列表 - GitHub 风格 */}
-      <div className="flex-1 overflow-y-auto" onScroll={handleScroll}>
-        {activities.length === 0 && taskStatus !== 'completed' && taskStatus !== 'failed' ? (
-          <div className="flex flex-col items-center justify-center h-full text-center p-8">
-            <div className="w-12 h-12 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin mb-4"></div>
-            <h3 className="text-base font-medium text-slate-700 mb-2">Waiting for task to start</h3>
-            <p className="text-sm text-slate-600">AI assistant is preparing to execute your task...</p> {/* text-slate-500 to text-slate-600 */}
-          </div>
-        ) : activities.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center p-8">
-            <h3 className="text-base font-medium text-slate-700 mb-2">No activities</h3>
-            <p className="text-sm text-slate-600">Task has {taskStatus === 'completed' ? 'completed' : 'ended'}</p> {/* text-slate-500 to text-slate-600 */}
-          </div>
-        ) : (
-          <div className="p-4">
-            {activities.map((activity, index) => (
-              <div key={activity.id} className="mb-4 last:mb-0">
-                {/* 活动项 - GitHub commit 风格 */}
-                <div className="flex items-start gap-3">
-                  {/* 时间线 */}
-                  <div className="flex flex-col items-center">
-                    <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
-                      {getActivityIcon(activity.type)}
-                    </div>
-                    {index < activities.length - 1 && (
-                      <div className="w-0.5 h-12 bg-slate-200 mt-2"></div>
-                    )}
-                  </div>
-
-                  {/* 内容 */}
-                  <div className="flex-1 -mt-1">
-                    <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow">
-                      <div className="flex items-start justify-between mb-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
-                            {getActivityTypeLabel(activity.type)}
-                          </span>
-                          {getStatusIcon(activity.status)}
-                        </div>
-                        <span className="text-xs text-slate-600"> {/* text-slate-500 to text-slate-600 */}
-                          {formatTimestamp(activity.timestamp)}
-                        </span>
+      {/* Combined scrollable area for Activity Log and Dialog Messages */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* 活动列表 - GitHub 风格 */}
+        <div className="h-3/5 overflow-y-auto" onScroll={handleScroll}> {/* Adjusted height, e.g., h-3/5 or some flex basis */}
+          {activities.length === 0 && taskStatus !== 'completed' && taskStatus !== 'failed' ? (
+            <div className="flex flex-col items-center justify-center h-full text-center p-8">
+              <div className="w-12 h-12 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin mb-4"></div>
+              <h3 className="text-base font-medium text-slate-700 mb-2">Waiting for task to start</h3>
+              <p className="text-sm text-slate-600">AI assistant is preparing to execute your task...</p>
+            </div>
+          ) : activities.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center p-8">
+              <h3 className="text-base font-medium text-slate-700 mb-2">No activities</h3>
+              <p className="text-sm text-slate-600">Task has {taskStatus === 'completed' ? 'completed' : 'ended'}</p>
+            </div>
+          ) : (
+            <div className="p-4">
+              {activities.map((activity, index) => (
+                <div key={activity.id} className="mb-4 last:mb-0">
+                  {/* ... activity item rendering ... */}
+                  <div className="flex items-start gap-3">
+                    <div className="flex flex-col items-center">
+                      <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                        {getActivityIcon(activity.type)}
                       </div>
-
-                      <p className="text-sm text-slate-800 font-medium mb-2">
-                        {activity.text}
-                      </p>
-
-                      {/* 命令或文件详情 */}
-                      {activity.command && (
-                        <div className="bg-slate-50 rounded p-2 font-mono text-xs text-slate-700 border border-slate-200">
-                          $ {activity.command}
-                        </div>
+                      {index < activities.length - 1 && (
+                        <div className="w-0.5 h-12 bg-slate-200 mt-2"></div>
                       )}
-
-                      {activity.filename && (
-                        <div className="flex items-center gap-2 text-xs text-slate-600 mt-2">
-                          <FolderOpen className="h-3.5 w-3.5" />
-                          <span className="font-mono">{activity.filename}</span>
+                    </div>
+                    <div className="flex-1 -mt-1">
+                      <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex items-start justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
+                              {getActivityTypeLabel(activity.type)}
+                            </span>
+                            {getStatusIcon(activity.status)}
+                          </div>
+                          <span className="text-xs text-slate-600">
+                            {formatTimestamp(activity.timestamp)}
+                          </span>
                         </div>
-                      )}
+                        <p className="text-sm text-slate-800 font-medium mb-2">
+                          {activity.text}
+                        </p>
+                        {activity.command && (
+                          <div className="bg-slate-50 rounded p-2 font-mono text-xs text-slate-700 border border-slate-200">
+                            $ {activity.command}
+                          </div>
+                        )}
+                        {activity.filename && (
+                          <div className="flex items-center gap-2 text-xs text-slate-600 mt-2">
+                            <FolderOpen className="h-3.5 w-3.5" />
+                            <span className="font-mono">{activity.filename}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
-            <div ref={activitiesEndRef} />
-          </div>
-        )}
-      </div>
+              ))}
+              <div ref={activitiesEndRef} />
+            </div>
+          )}
+        </div>
 
+        {/* Dialog Messages Area */}
+        <div 
+          ref={dialogDisplayRef} 
+          className="h-2/5 overflow-y-auto p-4 space-y-3 border-t border-b border-slate-300 bg-slate-50" // Adjusted height, e.g., h-2/5
+        >
+          {dialogMessages && dialogMessages.length > 0 ? (
+            dialogMessages.map((msg, index) => (
+              <div 
+                key={index} 
+                className={`flex ${msg.speaker === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div 
+                  className={`max-w-[80%] p-2 px-3 rounded-lg text-sm shadow-sm ${
+                    msg.speaker === 'user' 
+                      ? 'bg-blue-100 text-blue-800' 
+                      : 'bg-slate-200 text-slate-800' // Adjusted AI message style
+                  }`}
+                >
+                  <p className="whitespace-pre-wrap break-words">{msg.text}</p>
+                  <p className={`text-xs mt-1 text-right ${msg.speaker === 'user' ? 'text-blue-600' : 'text-slate-500'}`}>
+                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-sm text-slate-400 text-center py-4">
+              Chat history will appear here.
+            </div>
+          )}
+        </div>
+      </div>
+      
       {/* 用户输入区域 */}
       <div className="border-t border-slate-300 p-4 bg-white">
         <Textarea
           value={userInput}
           onChange={(e) => setUserInput(e.target.value)}
-          placeholder="Type your instructions or feedback here..."
+          placeholder={isViewingHistory ? "Input disabled while viewing history" : "Type your instructions or feedback here..."}
           className="w-full min-h-[80px] border-slate-300 focus:ring-sky-500 focus:border-sky-500 text-sm mb-2 placeholder:text-slate-500"
           rows={3}
+          disabled={isViewingHistory}
         />
         <div className="flex justify-end">
           <Button 
             size="sm" 
             className="bg-sky-600 hover:bg-sky-700 text-white"
             onClick={() => {
-              if (userInput.trim()) {
+              if (userInput.trim() && !isViewingHistory) {
                 onAddUserMessage(userInput.trim());
                 setUserInput('');
               }
             }}
+            disabled={isViewingHistory || !userInput.trim()}
           >
             <Send className="h-3.5 w-3.5 mr-2" />
             Send
@@ -201,6 +249,11 @@ export function DashboardContent({ activeTask, commandOutput, activities, taskSt
       {/* 底部状态栏 */}
       <div className="border-t border-slate-300 px-4 py-2 bg-slate-50">
         <div className="flex items-center justify-between text-xs text-slate-600">
+          <span>
+            {taskStatus === 'completed' ? '✓ Task completed' :
+             taskStatus === 'failed' ? '✗ Task failed' :
+             taskStatus === 'started' ? '● Running...' : '○ Waiting'}
+          </span>
           <span>
             {taskStatus === 'completed' ? '✓ Task completed' :
              taskStatus === 'failed' ? '✗ Task failed' :

@@ -7,7 +7,7 @@ import { ComputerView } from "@/components/computer-view"
 import { Terminal, AlertCircle, GitBranch, Activity, CheckCircle2, XCircle, Pause, Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { useTaskStream } from "@/lib/api"
+import { useTaskStream, Activity, FileStructureNode } from "@/lib/api" // Added Activity, FileStructureNode
 import { apiService } from "@/lib/api"
 
 // Define the message type
@@ -17,30 +17,125 @@ interface DialogMessage {
   timestamp: Date;
 }
 
+// Define History Snapshot type
+interface HistorySnapshot {
+  taskId: string | null; // taskId might be null initially if not available from searchParams
+  promptText: string;
+  activities: Activity[];
+  currentFile: string;
+  fileContent: string;
+  terminalOutput: string[];
+  fileStructure: FileStructureNode | null;
+  dialogMessages: DialogMessage[];
+  // Add other relevant states if needed, e.g., isPaused, taskStatus
+  // For simplicity, focusing on core content states first.
+  timestamp: number; // To identify snapshots
+}
+
 function DashboardPageContent() {
   const searchParams = useSearchParams()
   const taskId = searchParams?.get('taskId')
-  const prompt = searchParams?.get('prompt') || "AI任务执行中"
+  const promptText = searchParams?.get('prompt') || "AI任务执行中"
 
   const [isPaused, setIsPaused] = useState(false)
   const [dialogMessages, setDialogMessages] = useState<DialogMessage[]>([]);
 
+  // History State
+  const [history, setHistory] = useState<HistorySnapshot[]>([]);
+  const [currentHistoryIndex, setCurrentHistoryIndex] = useState<number>(-1); // -1 means live
+  const [isViewingHistory, setIsViewingHistory] = useState<boolean>(false);
+
+
   const handleAddUserMessage = (text: string) => {
+    if (isViewingHistory) return; // Don't add messages if viewing history
     setDialogMessages(prev => [...prev, { speaker: 'user', text, timestamp: new Date() }]);
-    // Here you might also send the message to a backend or AI service
   };
 
-  // 使用自定义 hook 获取流式数据
-  const {
-    activities,
-    currentFile,
-    fileContent,
-    taskStatus,
-    error,
-    isConnected,
-    terminalOutput,
-    fileStructure
-  } = useTaskStream(taskId)
+  // useTaskStream hook
+  const liveTaskState = useTaskStream(taskId);
+
+  // Snapshotting Logic
+  useEffect(() => {
+    if (isViewingHistory) {
+      return; // Don't capture new snapshots if currently viewing history
+    }
+
+    const newSnapshot: HistorySnapshot = {
+      taskId,
+      promptText, // Assuming promptText from searchParams is static for the session
+      activities: liveTaskState.activities,
+      currentFile: liveTaskState.currentFile,
+      fileContent: liveTaskState.fileContent,
+      terminalOutput: liveTaskState.terminalOutput,
+      fileStructure: liveTaskState.fileStructure,
+      dialogMessages,
+      timestamp: Date.now()
+    };
+
+    // Avoid adding duplicate snapshots if nothing significant changed
+    // This simple check might need to be more sophisticated
+    if (history.length > 0) {
+      const lastSnapshot = history[history.length - 1];
+      if (
+        lastSnapshot.activities === newSnapshot.activities &&
+        lastSnapshot.currentFile === newSnapshot.currentFile &&
+        lastSnapshot.fileContent === newSnapshot.fileContent &&
+        lastSnapshot.terminalOutput === newSnapshot.terminalOutput &&
+        lastSnapshot.dialogMessages === newSnapshot.dialogMessages &&
+        lastSnapshot.fileStructure === newSnapshot.fileStructure
+      ) {
+        return;
+      }
+    }
+    
+    setHistory(prevHistory => {
+      const updatedHistory = [...prevHistory, newSnapshot];
+      // Optional: Limit history size
+      // if (updatedHistory.length > 50) {
+      //   updatedHistory.shift(); 
+      // }
+      return updatedHistory;
+    });
+    // When a new snapshot is taken, we are effectively at the "live" end of this new history
+    setCurrentHistoryIndex(prevIdx => history.length); // history.length will be the index of the new item
+
+  }, [
+    liveTaskState.activities, 
+    liveTaskState.currentFile, 
+    liveTaskState.fileContent, 
+    liveTaskState.terminalOutput, 
+    liveTaskState.fileStructure, 
+    dialogMessages, 
+    isViewingHistory, 
+    taskId, 
+    promptText,
+    history // Added history to dep array for length check, careful with this
+  ]);
+
+  const handleHistoryChange = (newIndex: number) => {
+    if (newIndex === -1 || newIndex >= history.length) { // Go Live command
+      setIsViewingHistory(false);
+      setCurrentHistoryIndex(history.length > 0 ? history.length -1 : -1); // Point to the latest actual snapshot or -1 if empty
+    } else if (newIndex >= 0 && newIndex < history.length) {
+      setCurrentHistoryIndex(newIndex);
+      setIsViewingHistory(true);
+    }
+  };
+  
+  // Determine display state based on whether viewing history or live
+  const displayState: HistorySnapshot = isViewingHistory && history[currentHistoryIndex]
+    ? history[currentHistoryIndex]
+    : { // Construct live state object
+        taskId,
+        promptText,
+        activities: liveTaskState.activities,
+        currentFile: liveTaskState.currentFile,
+        fileContent: liveTaskState.fileContent,
+        terminalOutput: liveTaskState.terminalOutput,
+        fileStructure: liveTaskState.fileStructure,
+        dialogMessages,
+        timestamp: Date.now() // Live timestamp
+      };
 
   const handlePause = async () => {
     if (!taskId) return
@@ -87,8 +182,9 @@ function DashboardPageContent() {
     )
   }
 
+  // Use liveTaskState for status display, error, etc.
   const getStatusIcon = () => {
-    switch (taskStatus) {
+    switch (liveTaskState.taskStatus) {
       case 'completed':
         return <CheckCircle2 className="h-4 w-4 text-green-600" />
       case 'failed':
@@ -101,7 +197,7 @@ function DashboardPageContent() {
   }
 
   const getStatusText = () => {
-    switch (taskStatus) {
+    switch (liveTaskState.taskStatus) {
       case 'completed':
         return 'Completed'
       case 'failed':
@@ -131,10 +227,16 @@ function DashboardPageContent() {
                   <span className="font-medium">{getStatusText()}</span>
                 </div>
 
-                {isConnected && taskStatus === 'started' && (
+                {liveTaskState.isConnected && liveTaskState.taskStatus === 'started' && !isViewingHistory && (
                   <div className="flex items-center gap-2 text-slate-600">
                     <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
                     <span>Live sync</span>
+                  </div>
+                )}
+                {isViewingHistory && (
+                  <div className="flex items-center gap-2 text-amber-600">
+                    <Activity className="h-4 w-4" />
+                    <span>Viewing History</span>
                   </div>
                 )}
               </div>
@@ -145,7 +247,7 @@ function DashboardPageContent() {
                 variant="outline"
                 size="sm"
                 onClick={handlePause}
-                disabled={taskStatus === 'completed' || taskStatus === 'failed'}
+                disabled={liveTaskState.taskStatus === 'completed' || liveTaskState.taskStatus === 'failed' || isViewingHistory}
                 className="border-slate-300 hover:bg-slate-100"
               >
                 {isPaused ? <Play className="h-4 w-4 mr-1" /> : <Pause className="h-4 w-4 mr-1" />}
@@ -165,16 +267,16 @@ function DashboardPageContent() {
 
           {/* 任务描述 */}
           <div className="mt-3 pb-3">
-            <p className="text-slate-600 text-sm">{prompt}</p>
+            <p className="text-slate-600 text-sm">{displayState.promptText}</p>
           </div>
         </div>
 
         {/* 错误提示 */}
-        {error && !['completed', 'failed'].includes(taskStatus) && (
+        {liveTaskState.error && !['completed', 'failed'].includes(liveTaskState.taskStatus) && !isViewingHistory && (
           <div className="px-6 pb-3">
             <Alert variant="destructive" className="border-red-200 bg-red-50">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>{liveTaskState.error}</AlertDescription>
             </Alert>
           </div>
         )}
@@ -185,25 +287,31 @@ function DashboardPageContent() {
         {/* 左侧面板 - 活动日志 */}
         <div className="w-2/5 border-r border-slate-300 bg-white">
           <DashboardContent
-            activeTask={prompt}
-            commandOutput={[]}
-            activities={activities}
-            taskStatus={taskStatus}
-            onAddUserMessage={handleAddUserMessage} // Pass handler to DashboardContent
+            activeTask={displayState.promptText} // Use displayState
+            commandOutput={[]} // Assuming commandOutput is not part of history for now
+            activities={displayState.activities} // Use displayState
+            taskStatus={isViewingHistory ? 'history' : liveTaskState.taskStatus} // Adjust taskStatus display
+            onAddUserMessage={handleAddUserMessage}
+            dialogMessages={displayState.dialogMessages} // Use displayState
+            isViewingHistory={isViewingHistory} // Pass down isViewingHistory
           />
         </div>
 
         {/* 右侧面板 - 文件编辑器和终端 */}
         <div className="flex-1 bg-white">
           <ComputerView
-            currentFile={currentFile}
-            fileContent={fileContent}
-            setFileContent={() => {}}
-            isLive={isConnected}
-            taskStatus={taskStatus}
-            terminalOutput={terminalOutput}
-            fileStructure={fileStructure}
-            dialogMessages={dialogMessages} // Pass messages to ComputerView
+            currentFile={displayState.currentFile} // Use displayState
+            fileContent={displayState.fileContent} // Use displayState
+            setFileContent={() => {}} // Will be read-only if viewing history
+            isLive={liveTaskState.isConnected && !isViewingHistory} // Live only if not viewing history
+            taskStatus={isViewingHistory ? 'history' : liveTaskState.taskStatus} // Adjust taskStatus display
+            terminalOutput={displayState.terminalOutput} // Use displayState
+            fileStructure={displayState.fileStructure} // Use displayState
+            // dialogMessages prop is removed from ComputerView
+            isViewingHistory={isViewingHistory} // Pass down isViewingHistory
+            historyLength={history.length}
+            currentHistoryIndexValue={currentHistoryIndex} // Pass current history index
+            onHistoryChange={handleHistoryChange} // Pass handler
           />
         </div>
       </div>
@@ -212,12 +320,12 @@ function DashboardPageContent() {
       <div className="fixed bottom-0 left-0 right-0 bg-slate-100 border-t border-slate-200 text-slate-700 text-xs">
         <div className="px-6 py-2 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <span>Task ID: {taskId.slice(0, 8)}...</span>
-            <span>Activities: {activities.length}</span>
-            <span>Files: {fileStructure?.children?.length || 0}</span>
+            <span>Task ID: {displayState.taskId ? displayState.taskId.slice(0, 8) : 'N/A'}...</span>
+            <span>Activities: {displayState.activities.length}</span>
+            <span>Files: {displayState.fileStructure?.children?.length || 0}</span>
           </div>
           <div className="flex items-center gap-4">
-            <span>{new Date().toLocaleTimeString()}</span>
+            <span>{isViewingHistory ? `Viewing step ${currentHistoryIndex + 1} of ${history.length}` : new Date().toLocaleTimeString() }</span>
           </div>
         </div>
       </div>
