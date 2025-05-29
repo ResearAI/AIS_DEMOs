@@ -15,7 +15,7 @@ import 'prismjs/components/prism-typescript';
 import 'prismjs/components/prism-css';
 import 'prismjs/components/prism-json';
 // Choose a Prism theme. Ensure this is handled by the build process.
-import 'prismjs/themes/prism-okaidia.css'; // A popular dark theme
+import 'prismjs/themes/prism-coy.css'; // Changed to a light theme
 
 interface FileTab {
   id: string
@@ -74,7 +74,13 @@ export function ComputerView({
 
   // Initialize with current file
   useEffect(() => {
-    if (currentFile && fileContent && !fileTabs.find(tab => tab.filename === currentFile)) {
+    console.log('[ComputerView] Mount/Prop Effect (currentFile, fileContent, fileTabs):', 
+      'currentFile:', currentFile, 
+      'fileContent length:', fileContent?.length,
+      'isViewingHistory:', isViewingHistory
+    );
+    if (currentFile && fileContent !== undefined && fileContent !== null && !fileTabs.find(tab => tab.filename === currentFile) && !isViewingHistory) { // Allow empty string for fileContent
+      console.log('[ComputerView] Initializing new tab for currentFile:', currentFile, 'with content length:', fileContent.length);
       const newTab: FileTab = {
         id: `file-${Date.now()}`,
         filename: currentFile,
@@ -84,21 +90,44 @@ export function ComputerView({
       setFileTabs(prev => [...prev, newTab])
       setActiveFileId(newTab.id)
       setSelectedView('editing') // Ensure view is set to editing
-      setFileContents(prev => new Map(prev).set(currentFile, fileContent)) // Keep this for now, might simplify later
+      setFileContents(prev => {
+        const newMap = new Map(prev).set(currentFile, fileContent);
+        console.log('[ComputerView] Mount/Prop Effect - fileContents updated:', newMap);
+        return newMap;
+      });
       // If it's a new tab being auto-opened, store its initial content as original
       // The outer if already ensures !fileTabs.find(tab => tab.filename === currentFile)
-      setOriginalFileContents(prev => new Map(prev).set(currentFile, fileContent));
+      setOriginalFileContents(prev => {
+        const newMap = new Map(prev).set(currentFile, fileContent);
+        console.log('[ComputerView] Mount/Prop Effect - originalFileContents updated:', newMap);
+        return newMap;
+      });
     }
-  }, [currentFile, fileContent, fileTabs])
+  }, [currentFile, fileContent, fileTabs, isViewingHistory]) // Added isViewingHistory
 
-  // Update file content when it changes from server
+  // Update file content when it changes from server OR when fileContent prop changes while isLive
   useEffect(() => {
-    if (currentFile && fileContent && isLive) {
+    console.log('[ComputerView] Live Update Effect (currentFile, fileContent, isLive):',
+      'currentFile:', currentFile,
+      'fileContent length:', fileContent?.length,
+      'isLive:', isLive,
+      'isViewingHistory:', isViewingHistory
+    );
+    if (currentFile && fileContent !== undefined && fileContent !== null && isLive && !isViewingHistory) { // Allow empty string for fileContent, only apply if live and not viewing history
+      console.log('[ComputerView] Live Update - Applying server content for:', currentFile, 'with content length:', fileContent.length);
       // Update the live content cache
-      setFileContents(prev => new Map(prev).set(currentFile, fileContent));
+      setFileContents(prev => {
+        const newMap = new Map(prev).set(currentFile, fileContent);
+        console.log('[ComputerView] Live Update - fileContents updated:', newMap);
+        return newMap;
+      });
 
       // Server push becomes the new "original" baseline for this file
-      setOriginalFileContents(prevOrig => new Map(prevOrig).set(currentFile, fileContent));
+      setOriginalFileContents(prevOrig => {
+        const newMap = new Map(prevOrig).set(currentFile, fileContent);
+        console.log('[ComputerView] Live Update - originalFileContents updated:', newMap);
+        return newMap;
+      });
       
       // Update tab content and reset hasChanges as server content is now the baseline
       setFileTabs(prev => prev.map(tab =>
@@ -153,24 +182,30 @@ export function ComputerView({
   };
 
   const handleFileClick = (filename: string) => {
+    console.log('[ComputerView] handleFileClick - filename:', filename);
     // Check if file is already open
     const existingTab = fileTabs.find(tab => tab.filename === filename)
     if (existingTab) {
+      console.log('[ComputerView] handleFileClick - Tab already open:', existingTab.id);
       setActiveFileId(existingTab.id)
       setSelectedView('editing')
       return
     }
 
     // Create new tab
-    const content = fileContents.get(filename) || ''
+    const contentFromCache = fileContents.get(filename);
+    console.log('[ComputerView] handleFileClick - Content from fileContents cache for', filename, 'length:', contentFromCache?.length);
+    const content = contentFromCache || '' // Use cached content or empty string
+
     const newTab: FileTab = {
       id: `file-${Date.now()}`,
       filename,
-      content,
-      hasChanges: false
+      content, // Use content from cache
+      hasChanges: false // New tab shouldn't have changes initially based on cache
     }
+    console.log('[ComputerView] handleFileClick - New tab created:', newTab);
 
-    setFileTabs([...fileTabs, newTab])
+    setFileTabs(prevTabs => [...prevTabs, newTab]);
     setActiveFileId(newTab.id)
     setSelectedView('editing')
     // Store initial content as original when user clicks to open a file
@@ -366,7 +401,7 @@ export function ComputerView({
             // Container A: This will be the scrollable container
             <div 
               ref={scrollContainerRef}
-              className="flex-1 p-0 overflow-y-auto relative bg-slate-800" // Added bg-slate-800, kept overflow-y-auto
+              className="flex-1 p-0 overflow-y-auto relative bg-white" // Changed bg-slate-800 to bg-white
               onScroll={() => {
                 if (textareaRef.current && scrollContainerRef.current) {
                   textareaRef.current.scrollTop = scrollContainerRef.current.scrollTop;
@@ -377,7 +412,7 @@ export function ComputerView({
                 ref={textareaRef}
                 value={activeTab.content}
                 onChange={(e) => handleFileContentChange(activeTab.id, e.target.value)}
-                className="w-full h-full outline-none resize-none text-sm font-mono text-transparent bg-transparent caret-white p-4 absolute inset-0 z-10 overflow-hidden"
+                className="w-full h-full outline-none resize-none text-sm font-mono text-transparent bg-transparent caret-slate-700 p-4 absolute inset-0 z-10 overflow-hidden" // Changed caret-white to caret-slate-700
                 placeholder="Enter code..."
                 readOnly={isViewingHistory || (!isLive && taskStatus !== 'completed')}
                 style={{ lineHeight: '1.6' }}

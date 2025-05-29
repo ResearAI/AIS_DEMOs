@@ -137,6 +137,16 @@ function DashboardPageContent() {
         timestamp: Date.now() // Live timestamp
       };
 
+  // Diagnostic Log for displayState
+  useEffect(() => {
+    console.log("[DashboardPage] displayState updated:", 
+      "Current File:", displayState.currentFile, 
+      "File Content Length:", displayState.fileContent?.length,
+      "Is Viewing History:", isViewingHistory,
+      "History Index:", currentHistoryIndex
+      );
+  }, [displayState.currentFile, displayState.fileContent, isViewingHistory, currentHistoryIndex]); // Log when these specific parts of displayState change
+
   const handlePause = async () => {
     if (!taskId) return
 

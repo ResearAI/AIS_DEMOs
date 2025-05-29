@@ -119,13 +119,12 @@ export function DashboardContent({
         </div>
       </div>
 
-      {/* Combined scrollable area for Activity Log and Dialog Messages */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* 活动列表 - GitHub 风格 */}
-        <div className="h-3/5 overflow-y-auto" onScroll={handleScroll}> {/* Adjusted height, e.g., h-3/5 or some flex basis */}
-          {activities.length === 0 && taskStatus !== 'completed' && taskStatus !== 'failed' ? (
-            <div className="flex flex-col items-center justify-center h-full text-center p-8">
-              <div className="w-12 h-12 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin mb-4"></div>
+      {/* Activity Log Section (fixed proportion, scrollable) */}
+      <div className="flex-shrink-0 basis-2/5 overflow-y-auto border-b border-slate-300" onScroll={handleScroll}>
+        {/* Ensure p-4 is inside if this container itself doesn't have padding */}
+        {activities.length === 0 && taskStatus !== 'completed' && taskStatus !== 'failed' ? (
+          <div className="flex flex-col items-center justify-center h-full text-center p-8">
+            <div className="w-12 h-12 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin mb-4"></div>
               <h3 className="text-base font-medium text-slate-700 mb-2">Waiting for task to start</h3>
               <p className="text-sm text-slate-600">AI assistant is preparing to execute your task...</p>
             </div>
@@ -183,15 +182,14 @@ export function DashboardContent({
               <div ref={activitiesEndRef} />
             </div>
           )}
-        </div>
+      </div>
 
-        {/* Dialog Messages Area */}
-        <div 
-          ref={dialogDisplayRef} 
-          className="h-2/5 overflow-y-auto p-4 space-y-3 border-t border-b border-slate-300 bg-slate-50" // Adjusted height, e.g., h-2/5
-        >
-          {dialogMessages && dialogMessages.length > 0 ? (
-            dialogMessages.map((msg, index) => (
+      {/* Unified Conversation Area (takes remaining space, scrolls messages + input) */}
+      <div ref={dialogDisplayRef} className="flex-1 flex flex-col overflow-y-auto bg-slate-50"> {/* Main scroller for chat */}
+        {/* Dialog Messages Display (grows to fill space) */}
+        <div className="flex-grow p-4 space-y-3">
+          {(dialogMessages ?? []).length > 0 ? ( // Ensure dialogMessages is treated as array even if undefined initially
+            (dialogMessages ?? []).map((msg, index) => (
               <div 
                 key={index} 
                 className={`flex ${msg.speaker === 'user' ? 'justify-end' : 'justify-start'}`}
@@ -200,11 +198,11 @@ export function DashboardContent({
                   className={`max-w-[80%] p-2 px-3 rounded-lg text-sm shadow-sm ${
                     msg.speaker === 'user' 
                       ? 'bg-blue-100 text-blue-800' 
-                      : 'bg-slate-200 text-slate-800' // Adjusted AI message style
+                      : 'bg-slate-200 text-slate-800'
                   }`}
                 >
                   <p className="whitespace-pre-wrap break-words">{msg.text}</p>
-                  <p className={`text-xs mt-1 text-right ${msg.speaker === 'user' ? 'text-blue-600' : 'text-slate-500'}`}>
+                  <p className={`text-xs mt-1 ${msg.speaker === 'user' ? 'text-blue-600 text-right' : 'text-slate-500 text-left'}`}>
                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
@@ -212,42 +210,42 @@ export function DashboardContent({
             ))
           ) : (
             <div className="text-sm text-slate-400 text-center py-4">
-              Chat history will appear here.
+              Conversation will appear here.
             </div>
           )}
         </div>
-      </div>
-      
-      {/* 用户输入区域 */}
-      <div className="border-t border-slate-300 p-4 bg-white">
-        <Textarea
-          value={userInput}
-          onChange={(e) => setUserInput(e.target.value)}
-          placeholder={isViewingHistory ? "Input disabled while viewing history" : "Type your instructions or feedback here..."}
-          className="w-full min-h-[80px] border-slate-300 focus:ring-sky-500 focus:border-sky-500 text-sm mb-2 placeholder:text-slate-500"
-          rows={3}
-          disabled={isViewingHistory}
-        />
-        <div className="flex justify-end">
-          <Button 
-            size="sm" 
-            className="bg-sky-600 hover:bg-sky-700 text-white"
-            onClick={() => {
-              if (userInput.trim() && !isViewingHistory) {
-                onAddUserMessage(userInput.trim());
-                setUserInput('');
-              }
-            }}
-            disabled={isViewingHistory || !userInput.trim()}
-          >
-            <Send className="h-3.5 w-3.5 mr-2" />
-            Send
-          </Button>
+
+        {/* User Input Area (sticks to bottom of this scrollable container) */}
+        <div className="sticky bottom-0 border-t border-slate-300 p-4 bg-white"> {/* Sticky input area */}
+          <Textarea
+            value={userInput}
+            onChange={(e) => setUserInput(e.target.value)}
+            placeholder={isViewingHistory ? "Input disabled while viewing history" : "Type your instructions or feedback here..."}
+            className="w-full min-h-[60px] border-slate-300 focus:ring-sky-500 focus:border-sky-500 text-sm mb-2 placeholder:text-slate-500" // Reduced min-h
+            rows={2} // Reduced rows
+            disabled={isViewingHistory}
+          />
+          <div className="flex justify-end">
+            <Button 
+              size="sm" 
+              className="bg-sky-600 hover:bg-sky-700 text-white"
+              onClick={() => {
+                if (userInput.trim() && !isViewingHistory) {
+                  onAddUserMessage(userInput.trim());
+                  setUserInput('');
+                }
+              }}
+              disabled={isViewingHistory || !userInput.trim()}
+            >
+              <Send className="h-3.5 w-3.5 mr-2" />
+              Send
+            </Button>
+          </div>
         </div>
       </div>
-
+      
       {/* 底部状态栏 */}
-      <div className="border-t border-slate-300 px-4 py-2 bg-slate-50">
+      <div className="border-t border-slate-300 px-4 py-2 bg-slate-50 mt-auto"> {/* Added mt-auto to push to bottom if content above is short */}
         <div className="flex items-center justify-between text-xs text-slate-600">
           <span>
             {taskStatus === 'completed' ? '✓ Task completed' :
