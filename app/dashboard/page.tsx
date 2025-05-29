@@ -10,12 +10,25 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useTaskStream } from "@/lib/api"
 import { apiService } from "@/lib/api"
 
+// Define the message type
+interface DialogMessage {
+  speaker: 'user' | 'ai';
+  text: string;
+  timestamp: Date;
+}
+
 function DashboardPageContent() {
   const searchParams = useSearchParams()
   const taskId = searchParams?.get('taskId')
   const prompt = searchParams?.get('prompt') || "AI任务执行中"
 
   const [isPaused, setIsPaused] = useState(false)
+  const [dialogMessages, setDialogMessages] = useState<DialogMessage[]>([]);
+
+  const handleAddUserMessage = (text: string) => {
+    setDialogMessages(prev => [...prev, { speaker: 'user', text, timestamp: new Date() }]);
+    // Here you might also send the message to a backend or AI service
+  };
 
   // 使用自定义 hook 获取流式数据
   const {
@@ -83,7 +96,7 @@ function DashboardPageContent() {
       case 'started':
         return <Activity className="h-4 w-4 text-blue-600 animate-pulse" />
       default:
-        return <Activity className="h-4 w-4 text-gray-400" />
+        return <Activity className="h-4 w-4 text-slate-500" />
     }
   }
 
@@ -176,6 +189,7 @@ function DashboardPageContent() {
             commandOutput={[]}
             activities={activities}
             taskStatus={taskStatus}
+            onAddUserMessage={handleAddUserMessage} // Pass handler to DashboardContent
           />
         </div>
 
@@ -189,6 +203,7 @@ function DashboardPageContent() {
             taskStatus={taskStatus}
             terminalOutput={terminalOutput}
             fileStructure={fileStructure}
+            dialogMessages={dialogMessages} // Pass messages to ComputerView
           />
         </div>
       </div>

@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react" // Removed useMemo
+import { useState, useEffect, useCallback, useRef } from "react" // Removed useMemo, Added useRef
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent } from "@/components/ui/tabs" // TabsList and TabsTrigger will be removed
 import { Slider } from "@/components/ui/slider"
-import { Terminal, FileText, FolderTree, ChevronRight, ChevronDown, File, Folder, Info, X, Plus, ArrowLeft, ArrowRight, Save, RotateCcw, Eye, EyeOff } from "lucide-react"
+import { Terminal, FileText, FolderTree, ChevronRight, ChevronDown, File, Folder, Info, X, Plus, ArrowLeft, ArrowRight, Save, RotateCcw, Eye, EyeOff, MessageCircle } from "lucide-react"
 import { FileStructureNode } from "@/lib/api"
 import { marked } from 'marked'
 import Prism from 'prismjs';
@@ -32,6 +32,7 @@ interface ComputerViewProps {
   taskStatus?: string
   terminalOutput?: string[]
   fileStructure?: FileStructureNode | null
+  dialogMessages?: Array<{speaker: 'user' | 'ai', text: string, timestamp: Date}>; // Add new prop
 }
 
 export function ComputerView({
@@ -41,9 +42,10 @@ export function ComputerView({
   isLive = true,
   taskStatus = 'idle',
   terminalOutput = [],
-  fileStructure = null
+  fileStructure = null,
+  dialogMessages = [] // Default to empty array
 }: ComputerViewProps) {
-  const [selectedView, setSelectedView] = useState<string>('editing') // 'editing', 'terminal', 'info'
+  const [selectedView, setSelectedView] = useState<string>('editing') // 'editing', 'terminal', 'info', 'chat'
   const [fileTabs, setFileTabs] = useState<FileTab[]>([])
   const [activeFileId, setActiveFileId] = useState<string>('')
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['resear-pro-task']))
@@ -51,6 +53,16 @@ export function ComputerView({
   const [originalFileContents, setOriginalFileContents] = useState<Map<string, string>>(new Map())
   const [sliderValue, setSliderValue] = useState([50])
   const [showMarkdownPreview, setShowMarkdownPreview] = useState(true);
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const preRef = useRef<HTMLPreElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const terminalInputRef = useRef<HTMLInputElement>(null);
+  const terminalDisplayRef = useRef<HTMLDivElement>(null);
+  const chatDisplayRef = useRef<HTMLDivElement>(null); // Ref for chat display area
+
+  const [terminalInputValue, setTerminalInputValue] = useState('');
+  const [displayedTerminalOutput, setDisplayedTerminalOutput] = useState<string[]>([]);
 
   // Initialize with current file
   useEffect(() => {
@@ -95,6 +107,47 @@ export function ComputerView({
       setSelectedView('terminal')
     }
   }, [terminalOutput.length, selectedView])
+
+  // Effect to update displayedTerminalOutput when terminalOutput prop changes
+  useEffect(() => {
+    setDisplayedTerminalOutput(terminalOutput || []);
+  }, [terminalOutput]);
+
+  // Effect for auto-scrolling terminal
+  useEffect(() => {
+    if (selectedView === 'terminal' && terminalDisplayRef.current) {
+      terminalDisplayRef.current.scrollTop = terminalDisplayRef.current.scrollHeight;
+    }
+  }, [displayedTerminalOutput, selectedView]);
+
+  // Effect for auto-scrolling chat
+  useEffect(() => {
+    if (selectedView === 'chat' && chatDisplayRef.current) {
+      chatDisplayRef.current.scrollTop = chatDisplayRef.current.scrollHeight;
+    }
+  }, [dialogMessages, selectedView]);
+
+  // Effect for auto-focusing terminal input
+  useEffect(() => {
+    if (selectedView === 'terminal' && terminalInputRef.current) {
+      terminalInputRef.current.focus();
+    }
+  }, [selectedView]);
+
+  const handleTerminalInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setTerminalInputValue(e.target.value);
+  };
+
+  const handleTerminalInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && terminalInputValue.trim() !== '') {
+      e.preventDefault();
+      const commandToDisplay = `> ${terminalInputValue}`;
+      setDisplayedTerminalOutput(prevOutput => [...prevOutput, commandToDisplay]);
+      // TODO: Send command to backend: terminalInputValue
+      console.log(`Terminal command submitted: ${terminalInputValue}`);
+      setTerminalInputValue('');
+    }
+  };
 
   const handleFileClick = (filename: string) => {
     // Check if file is already open
@@ -305,10 +358,23 @@ export function ComputerView({
       }
 
       return (
-        <div className="h-full flex flex-col relative">
+        <div className="h-full flex flex-col relative"> {/* This container might not need to be flex flex-col if its child is the scroller */}
           {isCodeFile ? (
-            <div className="flex-1 p-0 overflow-hidden relative">
+            // Container A: This will be the scrollable container
+            <div 
+              ref={scrollContainerRef}
+              className="flex-1 p-0 overflow-y-auto relative" // Changed overflow-hidden to overflow-y-auto
+              onScroll={() => {
+                if (textareaRef.current && scrollContainerRef.current) {
+                  textareaRef.current.scrollTop = scrollContainerRef.current.scrollTop;
+                }
+                // if (preRef.current && scrollContainerRef.current) { // Not needed if pre is in normal flow
+                //   preRef.current.scrollTop = scrollContainerRef.current.scrollTop;
+                // }
+              }}
+            >
               <textarea
+                ref={textareaRef}
                 value={activeTab.content}
                 onChange={(e) => handleFileContentChange(activeTab.id, e.target.value)}
                 className="w-full h-full outline-none resize-none text-sm font-mono text-transparent bg-transparent caret-slate-800 p-4 absolute inset-0 z-10"
@@ -318,15 +384,17 @@ export function ComputerView({
                 spellCheck="false"
               />
               <pre 
-                className="w-full h-full outline-none resize-none text-sm font-mono p-4 absolute inset-0 z-0 overflow-auto"
-                style={{ lineHeight: '1.6', margin: 0 }}
+                ref={preRef}
+                className="w-full outline-none resize-none text-sm font-mono p-4 z-0" // Removed h-full, absolute, inset-0, overflow-auto
+                style={{ lineHeight: '1.6', margin: 0 }} 
                 aria-hidden="true"
               >
                 <code dangerouslySetInnerHTML={{ __html: highlightedContent }} />
               </pre>
             </div>
           ) : (
-            <div className="flex-1 p-4 overflow-hidden">
+            // Plain text editor
+            <div className="flex-1 p-4 overflow-hidden"> 
               <textarea
                 value={activeTab.content}
                 onChange={(e) => handleFileContentChange(activeTab.id, e.target.value)}
@@ -383,11 +451,20 @@ export function ComputerView({
           {/* Scrollable File Tabs */}
           <div className="flex-shrink-0 flex overflow-x-auto h-full">
             {fileTabs.map(tab => (
-              <button
+              <div
                 key={tab.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => {
                   setActiveFileId(tab.id)
                   setSelectedView('editing')
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setActiveFileId(tab.id);
+                    setSelectedView('editing');
+                  }
                 }}
                 className={`flex items-center gap-2 px-3 h-full text-sm cursor-pointer min-w-[120px] border-r border-slate-300
                   ${activeFileId === tab.id && selectedView === 'editing' 
@@ -401,10 +478,11 @@ export function ComputerView({
                 <button
                   onClick={(e) => handleCloseTab(tab.id, e)}
                   className="ml-auto p-0.5 hover:bg-slate-300 rounded flex-shrink-0"
+                  aria-label={`Close tab ${tab.filename}`}
                 >
                   <X className="h-3 w-3" />
                 </button>
-              </button>
+              </div>
             ))}
           </div>
 
@@ -433,6 +511,16 @@ export function ComputerView({
           >
             <Info className="h-4 w-4" />
             Info
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`h-full px-3 rounded-none text-sm flex items-center gap-1
+              ${selectedView === 'chat' ? 'bg-slate-200 text-slate-900' : 'text-slate-600 hover:bg-slate-200 hover:text-slate-800'}`}
+            onClick={() => setSelectedView('chat')}
+          >
+            <MessageCircle className="h-4 w-4" />
+            Chat
           </Button>
 
           {/* Spacer */}
@@ -478,24 +566,42 @@ export function ComputerView({
           {selectedView === 'editing' && renderEditorContent()}
 
           {selectedView === 'terminal' && (
-            <div className="h-full overflow-y-auto p-4 font-mono text-sm bg-slate-900">
-              {terminalOutput.length > 0 ? (
-                terminalOutput.map((line, i) => (
-                  <div
-                    key={i}
-                    className={`mb-1 ${
-                      line.startsWith('$') ? 'text-green-400 font-bold' : 'text-slate-300'
-                    }`}
-                    style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}
-                  >
-                    {line}
+            <div className="h-full flex flex-col bg-slate-900">
+              <div 
+                ref={terminalDisplayRef}
+                className="flex-1 overflow-y-auto p-4 font-mono text-sm"
+              >
+                {displayedTerminalOutput.length > 0 ? (
+                  displayedTerminalOutput.map((line, i) => (
+                    <div
+                      key={i}
+                      className={`mb-1 ${
+                        line.startsWith('$') ? 'text-green-400 font-bold' : 
+                        line.startsWith('>') ? 'text-sky-400' : 'text-slate-300' // User commands in sky blue
+                      }`}
+                      style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}
+                    >
+                      {line}
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-slate-400 text-center py-8">
+                    Waiting for terminal output...
                   </div>
-                ))
-              ) : (
-                <div className="text-slate-500 text-center py-8">
-                  Waiting for terminal output...
-                </div>
-              )}
+                )}
+              </div>
+              <div className="flex items-center p-2 border-t border-slate-700">
+                <span className="text-slate-400 font-mono text-sm mr-2">&gt;</span>
+                <input
+                  ref={terminalInputRef}
+                  type="text"
+                  value={terminalInputValue}
+                  onChange={handleTerminalInputChange}
+                  onKeyDown={handleTerminalInputKeyDown}
+                  className="flex-1 bg-transparent text-slate-300 outline-none font-mono text-sm placeholder:text-slate-500"
+                  placeholder="Type a command..."
+                />
+              </div>
             </div>
           )}
 
@@ -556,6 +662,36 @@ export function ComputerView({
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {selectedView === 'chat' && (
+            <div ref={chatDisplayRef} className="h-full overflow-y-auto p-4 space-y-3">
+              {dialogMessages && dialogMessages.length > 0 ? (
+                dialogMessages.map((msg, index) => (
+                  <div 
+                    key={index} 
+                    className={`flex ${msg.speaker === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div 
+                      className={`max-w-[70%] p-3 rounded-lg text-sm ${
+                        msg.speaker === 'user' 
+                          ? 'bg-blue-500 text-white' 
+                          : 'bg-slate-200 text-slate-800'
+                      }`}
+                    >
+                      <p>{msg.text}</p>
+                      <p className={`text-xs mt-1 ${msg.speaker === 'user' ? 'text-blue-200' : 'text-slate-500'}`}>
+                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-slate-400 text-center py-8">
+                  No chat messages yet.
+                </div>
+              )}
             </div>
           )}
         </div>

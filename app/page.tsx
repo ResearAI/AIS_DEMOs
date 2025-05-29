@@ -69,10 +69,10 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 relative overflow-hidden">
+    <main className="min-h-screen bg-slate-50 relative overflow-hidden">
       {/* 水墨画背景 - 极淡 */}
       <div className="absolute inset-0">
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-gray-50/95 to-gray-100/90"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-slate-50/95 to-slate-100/90"></div>
         <svg className="absolute inset-0 w-full h-full opacity-[0.07]" preserveAspectRatio="xMidYMid slice">
           <filter id="ink">
             <feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="4" result="turbulence"/>
@@ -89,14 +89,14 @@ export default function Home() {
             <div className="inline-block relative">
               <h1 className="text-6xl font-extralight tracking-tight">
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-slate-700 via-sky-600 to-slate-700">Resear</span>
-                <span className="font-normal text-gray-800 ml-2">Pro</span>
+                <span className="font-normal text-slate-800 ml-2">Pro</span>
               </h1>
-              <div className="absolute -top-3 -right-3 text-gray-400 opacity-50">
+              <div className="absolute -top-3 -right-3 text-slate-400 opacity-50">
                 <Sparkles className="w-4 h-4" />
               </div>
             </div>
 
-            <p className="mt-4 text-gray-600 font-light">
+            <p className="mt-4 text-slate-700 font-light">
               AI-powered research assistant
             </p>
           </div>
@@ -107,10 +107,10 @@ export default function Home() {
               <div className={`
                 backdrop-blur-xl bg-white/60 border rounded-2xl 
                 shadow-lg hover:shadow-xl transition-all duration-300
-                ${isFocused ? 'border-gray-300 shadow-gray-200/50' : 'border-gray-200/50'}
+                ${isFocused ? 'border-slate-300 shadow-slate-200/50' : 'border-slate-200/50'}
               `}>
                 <textarea
-                  className="w-full px-6 py-5 text-base resize-none border-0 bg-transparent focus:outline-none placeholder:text-gray-400 min-h-[120px]"
+                  className="w-full px-6 py-5 text-base resize-none border-0 bg-transparent focus:outline-none placeholder:text-slate-500 min-h-[120px]"
                   placeholder="Describe your research task..."
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
@@ -119,13 +119,13 @@ export default function Home() {
                   disabled={isSubmitting}
                 />
 
-                <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200/30">
+                <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200/30">
                   <div className="flex items-center gap-4">
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="text-gray-600 hover:text-gray-800 hover:bg-gray-100/50"
+                      className="text-slate-600 hover:text-slate-800 hover:bg-slate-100/50"
                       onClick={triggerFileInput}
                       disabled={isSubmitting}
                     >
@@ -143,7 +143,7 @@ export default function Home() {
                     />
 
                     {attachments.length > 0 && (
-                      <span className="text-sm text-gray-600">
+                      <span className="text-sm text-slate-700">
                         {attachments.length} file{attachments.length > 1 ? 's' : ''} attached
                       </span>
                     )}
@@ -172,25 +172,25 @@ export default function Home() {
 
             {/* 文件列表 - 简约风格 */}
             {attachments.length > 0 && (
-              <div className="backdrop-blur-lg bg-white/60 border border-gray-200/50 rounded-xl p-4 shadow-sm">
-                <h3 className="text-sm font-medium text-gray-700 mb-3">
+              <div className="backdrop-blur-lg bg-white/60 border border-slate-200/50 rounded-xl p-4 shadow-sm">
+                <h3 className="text-sm font-medium text-slate-700 mb-3">
                   Attached Files
                 </h3>
                 <div className="space-y-2">
                   {attachments.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between py-2 px-3 bg-gray-50/50 rounded-lg">
+                    <div key={index} className="flex items-center justify-between py-2 px-3 bg-slate-50/50 rounded-lg">
                       <div className="flex items-center gap-3">
-                        <FileText className="h-4 w-4 text-gray-500" />
+                        <FileText className="h-4 w-4 text-slate-500" />
                         <div>
-                          <p className="text-sm font-medium text-gray-700">{file.name}</p>
-                          <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                          <p className="text-sm font-medium text-slate-700">{file.name}</p>
+                          <p className="text-xs text-slate-500">{formatFileSize(file.size)}</p>
                         </div>
                       </div>
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="h-7 w-7 p-0 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                        className="h-7 w-7 p-0 text-slate-500 hover:text-red-600 hover:bg-red-50"
                         onClick={() => removeAttachment(index)}
                         disabled={isSubmitting}
                       >
@@ -206,11 +206,11 @@ export default function Home() {
           {/* 提交状态 - 简约动画 */}
           {isSubmitting && (
             <div className="text-center mt-8">
-              <div className="inline-flex items-center gap-3 text-gray-700">
+              <div className="inline-flex items-center gap-3 text-slate-700">
                 <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-gray-600 rounded-full animate-pulse"></div>
-                  <div className="w-2 h-2 bg-gray-600 rounded-full animate-pulse" style={{ animationDelay: '150ms' }}></div>
-                  <div className="w-2 h-2 bg-gray-600 rounded-full animate-pulse" style={{ animationDelay: '300ms' }}></div>
+                  <div className="w-2 h-2 bg-slate-600 rounded-full animate-pulse"></div>
+                  <div className="w-2 h-2 bg-slate-600 rounded-full animate-pulse" style={{ animationDelay: '150ms' }}></div>
+                  <div className="w-2 h-2 bg-slate-600 rounded-full animate-pulse" style={{ animationDelay: '300ms' }}></div>
                 </div>
                 <span className="text-sm">Processing your request</span>
               </div>

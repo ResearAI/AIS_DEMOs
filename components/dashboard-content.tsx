@@ -11,9 +11,10 @@ interface DashboardContentProps {
   commandOutput: string[]
   activities: Activity[]
   taskStatus: string
+  onAddUserMessage: (text: string) => void; // Add new prop
 }
 
-export function DashboardContent({ activeTask, commandOutput, activities, taskStatus }: DashboardContentProps) {
+export function DashboardContent({ activeTask, commandOutput, activities, taskStatus, onAddUserMessage }: DashboardContentProps) {
   const activitiesEndRef = useRef<HTMLDivElement>(null)
   const [autoScroll, setAutoScroll] = useState(true)
   const [userInput, setUserInput] = useState("")
@@ -88,8 +89,8 @@ export function DashboardContent({ activeTask, commandOutput, activities, taskSt
   return (
     <div className="h-full flex flex-col">
       {/* 顶部标题栏 - GitHub 风格 */}
-      <div className="border-b border-slate-300 px-4 py-3">
-        <div className="flex items-center justify-between">
+      <div className="flex items-center border-b border-slate-300 px-4 h-10"> {/* Changed py-3 to h-10 and added flex items-center */}
+        <div className="flex items-center justify-between w-full"> {/* Added w-full to ensure justify-between works */}
           <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
             <Code2 className="h-4 w-4" />
             活动日志
@@ -106,12 +107,12 @@ export function DashboardContent({ activeTask, commandOutput, activities, taskSt
           <div className="flex flex-col items-center justify-center h-full text-center p-8">
             <div className="w-12 h-12 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin mb-4"></div>
             <h3 className="text-base font-medium text-slate-700 mb-2">Waiting for task to start</h3>
-            <p className="text-sm text-slate-500">AI assistant is preparing to execute your task...</p>
+            <p className="text-sm text-slate-600">AI assistant is preparing to execute your task...</p> {/* text-slate-500 to text-slate-600 */}
           </div>
         ) : activities.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center p-8">
             <h3 className="text-base font-medium text-slate-700 mb-2">No activities</h3>
-            <p className="text-sm text-slate-500">Task has {taskStatus === 'completed' ? 'completed' : 'ended'}</p>
+            <p className="text-sm text-slate-600">Task has {taskStatus === 'completed' ? 'completed' : 'ended'}</p> {/* text-slate-500 to text-slate-600 */}
           </div>
         ) : (
           <div className="p-4">
@@ -139,7 +140,7 @@ export function DashboardContent({ activeTask, commandOutput, activities, taskSt
                           </span>
                           {getStatusIcon(activity.status)}
                         </div>
-                        <span className="text-xs text-slate-500">
+                        <span className="text-xs text-slate-600"> {/* text-slate-500 to text-slate-600 */}
                           {formatTimestamp(activity.timestamp)}
                         </span>
                       </div>
@@ -177,14 +178,19 @@ export function DashboardContent({ activeTask, commandOutput, activities, taskSt
           value={userInput}
           onChange={(e) => setUserInput(e.target.value)}
           placeholder="Type your instructions or feedback here..."
-          className="w-full min-h-[80px] border-slate-300 focus:ring-sky-500 focus:border-sky-500 text-sm mb-2"
+          className="w-full min-h-[80px] border-slate-300 focus:ring-sky-500 focus:border-sky-500 text-sm mb-2 placeholder:text-slate-500"
           rows={3}
         />
         <div className="flex justify-end">
           <Button 
             size="sm" 
             className="bg-sky-600 hover:bg-sky-700 text-white"
-            onClick={() => console.log("User input:", userInput)} // Placeholder action
+            onClick={() => {
+              if (userInput.trim()) {
+                onAddUserMessage(userInput.trim());
+                setUserInput('');
+              }
+            }}
           >
             <Send className="h-3.5 w-3.5 mr-2" />
             Send
