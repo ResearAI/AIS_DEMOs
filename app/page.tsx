@@ -69,16 +69,50 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 relative overflow-hidden">
-      {/* 水墨画背景 - 极淡 */}
+    <main className="min-h-screen relative overflow-hidden" style={{ backgroundColor: 'rgb(245, 244, 240)' }}>
+      {/* 水墨画背景 - 40% 透明度 */}
       <div className="absolute inset-0">
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-slate-50/95 to-slate-100/90"></div>
-        <svg className="absolute inset-0 w-full h-full opacity-[0.07]" preserveAspectRatio="xMidYMid slice">
-          <filter id="ink">
-            <feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="4" result="turbulence"/>
-            <feColorMatrix in="turbulence" type="saturate" values="0"/>
-          </filter>
-          <rect width="100%" height="100%" filter="url(#ink)"/>
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgb(245, 244, 240) 0%, rgba(245, 244, 240, 0.95) 50%, rgba(240, 238, 235, 0.9) 100%)' }}></div>
+        <svg className="absolute inset-0 w-full h-full opacity-40" preserveAspectRatio="xMidYMid slice">
+          <defs>
+            <filter id="ink">
+              <feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="4" result="turbulence"/>
+              <feColorMatrix in="turbulence" type="saturate" values="0"/>
+              <feColorMatrix in="SourceGraphic" values="0.3 0.3 0.3 0 0  0.3 0.3 0.3 0 0  0.3 0.3 0.3 0 0  0 0 0 1 0"/>
+            </filter>
+            <filter id="paper-texture">
+              <feTurbulence baseFrequency="0.04" numOctaves="5" result="noise"/>
+              <feColorMatrix in="noise" type="saturate" values="0"/>
+              <feComponentTransfer>
+                <feFuncA type="discrete" tableValues="0.1 0.05 0.15 0.05 0.1"/>
+              </feComponentTransfer>
+              <feComposite operator="multiply" in2="SourceGraphic"/>
+            </filter>
+          </defs>
+
+          {/* 背景纸张质感 */}
+          <rect width="100%" height="100%" fill="rgb(248, 247, 243)" filter="url(#paper-texture)"/>
+
+          {/* 水墨纹理 */}
+          <rect width="100%" height="100%" filter="url(#ink)" fill="#8b7355" opacity="0.6"/>
+
+          {/* 添加一些水墨笔触效果 */}
+          <g opacity="0.3">
+            <path d="M 100 200 Q 300 100 500 300 T 900 200" stroke="#6b5b47" strokeWidth="2" fill="none" opacity="0.8"/>
+            <path d="M 200 500 Q 400 300 600 600 T 1000 400" stroke="#8b7355" strokeWidth="1.5" fill="none" opacity="0.6"/>
+            <path d="M 50 700 Q 250 600 450 800 T 850 700" stroke="#a69080" strokeWidth="1" fill="none" opacity="0.4"/>
+
+            {/* 水墨点 */}
+            <circle cx="200" cy="150" r="3" fill="#6b5b47" opacity="0.5"/>
+            <circle cx="600" cy="250" r="2" fill="#8b7355" opacity="0.4"/>
+            <circle cx="800" cy="600" r="4" fill="#a69080" opacity="0.3"/>
+            <circle cx="300" cy="700" r="2.5" fill="#8b7355" opacity="0.4"/>
+
+            {/* 更多装饰性元素 */}
+            <ellipse cx="400" cy="100" rx="20" ry="5" fill="#8b7355" opacity="0.2" transform="rotate(30 400 100)"/>
+            <ellipse cx="700" cy="400" rx="15" ry="8" fill="#6b5b47" opacity="0.3" transform="rotate(-45 700 400)"/>
+            <ellipse cx="150" cy="600" rx="25" ry="6" fill="#a69080" opacity="0.2" transform="rotate(60 150 600)"/>
+          </g>
         </svg>
       </div>
 
@@ -97,7 +131,7 @@ export default function Home() {
             </div>
 
             <p className="mt-4 text-slate-700 font-light">
-              AI-powered research assistant
+              AI-powered research assistant with multimedia support
             </p>
           </div>
 
@@ -105,13 +139,13 @@ export default function Home() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className={`relative transition-all duration-300 ${isFocused ? 'transform -translate-y-1' : ''}`}>
               <div className={`
-                backdrop-blur-xl bg-white/60 border rounded-2xl 
+                backdrop-blur-xl bg-white/70 border rounded-2xl 
                 shadow-lg hover:shadow-xl transition-all duration-300
-                ${isFocused ? 'border-slate-300 shadow-slate-200/50' : 'border-slate-200/50'}
+                ${isFocused ? 'border-slate-300 shadow-slate-200/50 bg-white/80' : 'border-slate-200/50'}
               `}>
                 <textarea
                   className="w-full px-6 py-5 text-base resize-none border-0 bg-transparent focus:outline-none placeholder:text-slate-500 min-h-[120px]"
-                  placeholder="Describe your research task..."
+                  placeholder="Describe your research task... (e.g., Create a presentation about AI, analyze this document, generate charts)"
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   onFocus={() => setIsFocused(true)}
@@ -172,13 +206,13 @@ export default function Home() {
 
             {/* 文件列表 - 简约风格 */}
             {attachments.length > 0 && (
-              <div className="backdrop-blur-lg bg-white/60 border border-slate-200/50 rounded-xl p-4 shadow-sm">
+              <div className="backdrop-blur-lg bg-white/70 border border-slate-200/50 rounded-xl p-4 shadow-sm">
                 <h3 className="text-sm font-medium text-slate-700 mb-3">
                   Attached Files
                 </h3>
                 <div className="space-y-2">
                   {attachments.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between py-2 px-3 bg-slate-50/50 rounded-lg">
+                    <div key={index} className="flex items-center justify-between py-2 px-3 bg-slate-50/70 rounded-lg">
                       <div className="flex items-center gap-3">
                         <FileText className="h-4 w-4 text-slate-500" />
                         <div>
@@ -206,13 +240,13 @@ export default function Home() {
           {/* 提交状态 - 简约动画 */}
           {isSubmitting && (
             <div className="text-center mt-8">
-              <div className="inline-flex items-center gap-3 text-slate-700">
+              <div className="inline-flex items-center gap-3 text-slate-700 backdrop-blur-sm bg-white/50 px-4 py-2 rounded-lg">
                 <div className="flex space-x-1">
                   <div className="w-2 h-2 bg-slate-600 rounded-full animate-pulse"></div>
                   <div className="w-2 h-2 bg-slate-600 rounded-full animate-pulse" style={{ animationDelay: '150ms' }}></div>
                   <div className="w-2 h-2 bg-slate-600 rounded-full animate-pulse" style={{ animationDelay: '300ms' }}></div>
                 </div>
-                <span className="text-sm">Processing your request</span>
+                <span className="text-sm">Creating your AI workspace...</span>
               </div>
             </div>
           )}

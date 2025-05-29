@@ -24,6 +24,36 @@ active_tasks: Dict[str, Dict[str, Any]] = {}  # 活跃任务存储
 task_queues: Dict[str, queue.Queue] = {}  # 任务消息队列
 task_executors: Dict[str, 'TaskExecutor'] = {}  # 任务执行器实例
 
+# 示例多媒体内容 - 使用真实URL
+SAMPLE_MEDIA = {
+    'research_paper.pdf': {
+        'type': 'pdf',
+        'url': 'https://openreview.net/pdf?id=bjcsVLoHYs',
+        'description': 'A research paper on neural networks from OpenReview'
+    },
+    'brand_logo.png': {
+        'type': 'image',
+        'url': 'https://bianxieai.com/wp-content/uploads/2024/05/bianxieai.png',
+        'description': 'Brand logo image for demonstration'
+    },
+    'demo_chart.svg': {
+        'type': 'image',
+        'content': '''<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
+  <rect width="100%" height="100%" fill="#f8fafc"/>
+  <rect x="50" y="50" width="60" height="150" fill="#3b82f6"/>
+  <rect x="130" y="80" width="60" height="120" fill="#06d6a0"/>
+  <rect x="210" y="100" width="60" height="100" fill="#f72585"/>
+  <rect x="290" y="70" width="60" height="130" fill="#ffd60a"/>
+  <text x="200" y="30" text-anchor="middle" font-family="Arial" font-size="16" fill="#1e293b">Sample Chart Data</text>
+  <text x="80" y="230" text-anchor="middle" font-size="12" fill="#64748b">Q1</text>
+  <text x="160" y="230" text-anchor="middle" font-size="12" fill="#64748b">Q2</text>
+  <text x="240" y="230" text-anchor="middle" font-size="12" fill="#64748b">Q3</text>
+  <text x="320" y="230" text-anchor="middle" font-size="12" fill="#64748b">Q4</text>
+</svg>''',
+        'description': 'A sample chart for data visualization demo'
+    }
+}
+
 
 class TaskExecutor:
     """
@@ -242,6 +272,31 @@ class TaskExecutor:
         else:
             time.sleep(step_duration)
 
+    def create_media_files(self):
+        """创建示例多媒体文件"""
+        media_files_created = []
+
+        for filename, media_info in SAMPLE_MEDIA.items():
+            file_id = self.emit_activity("file", f"Creating media file: {filename}", filename=filename,
+                                         status="in-progress")
+            self.wait_if_paused(1)
+
+            # 根据媒体类型处理内容
+            if 'url' in media_info:
+                # 使用真实的URL
+                self.emit_file_update(filename, media_info['url'])
+            elif 'content' in media_info:
+                # 使用提供的内容（如SVG）
+                self.emit_file_update(filename, media_info['content'])
+            else:
+                # 默认文本内容
+                self.emit_file_update(filename, f'Content for {filename}')
+
+            self.update_activity_status(file_id, "completed")
+            media_files_created.append(filename)
+
+        return media_files_created
+
     def execute_task(self):
         """
         执行任务的主要逻辑
@@ -250,15 +305,17 @@ class TaskExecutor:
         try:
             # 1. 任务开始
             self.emit_task_update("started")
-            thinking_id = self.emit_activity("thinking", "Analyzing task requirements...", status="in-progress")
+            thinking_id = self.emit_activity("thinking", "Analyzing task requirements and preparing multimedia demo...",
+                                             status="in-progress")
             self.wait_if_paused(2)
             self.update_activity_status(thinking_id, "completed")
 
             # 2. 创建工作环境
-            cmd_id = self.emit_activity("command", "Creating workspace and environment setup", status="in-progress")
-            command = "mkdir -p workspace && cd workspace"
+            cmd_id = self.emit_activity("command", "Creating workspace with multimedia support", status="in-progress")
+            command = "mkdir -p workspace/media && cd workspace"
             self.wait_if_paused(1)
-            self.emit_terminal_output(command, "Directory created successfully\nChanged to workspace directory")
+            self.emit_terminal_output(command,
+                                      "Directory created successfully\nMultimedia workspace initialized\nReady for PDF, images, and interactive content")
             self.update_activity_status(cmd_id, "completed", command=command)
 
             # 3. 创建任务清单文件 (todo.md)
@@ -266,215 +323,162 @@ class TaskExecutor:
 
 ## Task Analysis
 - [x] Understand user requirements
-- [ ] Develop execution plan
-- [ ] Create project files
-- [ ] Implement core functionality
-- [ ] Test and verify
+- [x] Setup multimedia workspace
+- [ ] Create real multimedia demos
+- [ ] Generate PDF and image content
+- [ ] Create interactive examples
+- [ ] Test multimedia support
 - [ ] Complete task
+
+## Multimedia Demo Features
+- 📸 Real image display (brand_logo.png)
+- 📄 Live PDF viewing (research_paper.pdf) 
+- 📊 Interactive charts and graphs
+- 🎨 SVG graphics and data visualization
+
+## Live Demo Sources
+- PDF: https://openreview.net/pdf?id=bjcsVLoHYs
+- Image: https://bianxieai.com/wp-content/uploads/2024/05/bianxieai.png
 
 ## Execution Log
 Start time: {time.strftime('%Y-%m-%d %H:%M:%S')}
-Status: In progress
+Status: In progress with real multimedia content
 
 ## File List
 - todo.md (Task checklist)
 - config.json (Configuration file)
 - main.py (Main program file)
+- research_paper.pdf (Real PDF from OpenReview)
+- brand_logo.png (Real image from web)
+- demo_chart.svg (Interactive chart)
 """
 
             self.current_file = "todo.md"
             self.file_content = initial_todo
 
-            file_id = self.emit_activity("file", "Creating task checklist file", filename="todo.md", status="in-progress")
+            file_id = self.emit_activity("file", "Creating enhanced task checklist with real URLs", filename="todo.md",
+                                         status="in-progress")
             self.wait_if_paused(1)
             self.emit_file_update("todo.md", initial_todo)
             self.update_activity_status(file_id, "completed")
 
-            # 4. 创建配置文件 (config.json)
+            # 4. 创建多媒体演示文件
+            media_thinking_id = self.emit_activity("thinking", "Downloading and preparing real multimedia files...",
+                                                   status="in-progress")
+            self.wait_if_paused(2)
+            self.update_activity_status(media_thinking_id, "completed")
+
+            created_media = self.create_media_files()
+
+            # 5. 创建配置文件
             config_content = json.dumps({
                 "project": {
-                    "name": "Resear Pro Task",
-                    "version": "1.0.0",
-                    "description": "AI research assistant task execution",
+                    "name": "Resear Pro Task - Real Multimedia Edition",
+                    "version": "2.0.0",
+                    "description": "AI research assistant with real multimedia support",
                     "created": time.strftime('%Y-%m-%d %H:%M:%S')
                 },
                 "settings": {
                     "debug": True,
                     "auto_save": True,
                     "max_retries": 3,
-                    "features": ["streaming", "real-time", "multi-file"]
+                    "features": ["streaming", "real-time", "multi-file", "multimedia", "real-pdf-viewer",
+                                 "live-images"],
+                    "supported_formats": ["txt", "md", "json", "py", "js", "css", "png", "jpg", "gif", "svg", "pdf",
+                                          "mp4", "webm"]
+                },
+                "multimedia": {
+                    "real_urls": True,
+                    "pdf_source": "https://openreview.net/pdf?id=bjcsVLoHYs",
+                    "image_source": "https://bianxieai.com/wp-content/uploads/2024/05/bianxieai.png",
+                    "preview_enabled": True
                 },
                 "execution": {
-                    "max_steps": 10,
-                    "timeout": 300,
+                    "max_steps": 15,
+                    "timeout": 600,
                     "retry_count": 3,
-                    "parallel_processing": False
+                    "parallel_processing": True
                 },
                 "task": {
                     "description": self.prompt,
                     "priority": "normal",
-                    "estimated_duration": "5-10 minutes"
+                    "estimated_duration": "10-15 minutes",
+                    "multimedia_demo": True,
+                    "created_media": created_media
                 }
             }, indent=2, ensure_ascii=False)
 
-            config_id = self.emit_activity("file", "Creating project configuration file", filename="config.json", status="in-progress")
+            config_id = self.emit_activity("file", "Creating project configuration with real URLs",
+                                           filename="config.json", status="in-progress")
             self.wait_if_paused(1)
             self.emit_file_update("config.json", config_content)
-            cmd = "touch config.json && echo 'Configuration file created'"
-            self.emit_terminal_output(cmd, "Configuration file created")
             self.update_activity_status(config_id, "completed")
 
-            # 5. 创建主程序文件 (main.py)
-            python_content = f'''#!/usr/bin/env python3
+            # 6. 创建 Markdown 演示文件
+            markdown_content = f"""# Real Multimedia Demo Report
+
+## Task Overview
+**Task:** {self.prompt}  
+**Created:** {time.strftime('%Y-%m-%d %H:%M:%S')}  
+**Status:** ✅ In Progress
+
+## Live Multimedia Capabilities
+
+### 📸 Real Image Support
+Displaying actual images from the web:
+
+![Brand Logo](https://bianxieai.com/wp-content/uploads/2024/05/bianxieai.png)
+
+### 📊 Interactive Data Visualization
+Live chart rendering with SVG:
+
+![Demo Chart](demo_chart.svg)
+
+### 📄 Live PDF Document Viewing
+Real research paper with full viewer functionality:
+
+[View Research Paper](https://openreview.net/pdf?id=bjcsVLoHYs)
+
+## Real Demo Sources
+- **PDF Document**: OpenReview research paper on neural networks
+- **Brand Image**: Live web image with proper loading
+- **Interactive Chart**: SVG-based data visualization
+
+## Features Demonstrated
+- ✅ Real-time image loading from web URLs
+- ✅ Live PDF document viewing with navigation
+- ✅ Interactive SVG chart rendering
+- ✅ Markdown preview with embedded media
+- ✅ Multi-tab file management system
+- ✅ Responsive multimedia layout
+
+## Technical Implementation
+- Direct URL integration for media files
+- PDF.js powered document viewer
+- Native image loading with error handling
+- SVG graphics for interactive charts
+
+---
+*Generated by Resear Pro AI Assistant with Real Multimedia URLs*
 """
-Resear Pro - AI Task Executor
-Generated at: {time.strftime('%Y-%m-%d %H:%M:%S')}
-Task description: {self.prompt}
-"""
 
-import json
-import time
-import logging
-from datetime import datetime
-from typing import Dict, List, Any
-
-# 配置日志
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-class TaskExecutor:
-    """Task executor class"""
-
-    def __init__(self, config_file: str = "config.json"):
-        """
-        Initialize task executor
-
-        Args:
-            config_file: Configuration file path
-        """
-        self.load_config(config_file)
-        self.start_time = datetime.now()
-        self.completed_steps = 0
-
-    def load_config(self, config_file: str):
-        """Load configuration file"""
-        try:
-            with open(config_file, 'r', encoding='utf-8') as f:
-                self.config = json.load(f)
-            logger.info("Configuration file loaded successfully")
-        except Exception as e:
-            logger.error(f"Failed to load configuration file: {{e}}")
-            self.config = {{"project": {{"name": "Default Task"}}}}
-
-    def log_progress(self, message: str, step: int = None):
-        """Log progress message"""
-        timestamp = datetime.now().strftime('%H:%M:%S')
-        if step:
-            print(f"[{{timestamp}}] Step {{step}}: {{message}}")
-        else:
-            print(f"[{{timestamp}}] {{message}}")
-
-    def execute_step(self, step_name: str, duration: float = 1.0) -> bool:
-        """
-        Execute a single step
-
-        Args:
-            step_name: Step name
-            duration: Simulated execution time
-
-        Returns:
-            Whether execution was successful
-        """
-        self.log_progress(f"Starting: {{step_name}}")
-
-        try:
-            # Simulate step execution
-            time.sleep(duration)
-            self.completed_steps += 1
-            self.log_progress(f"Completed: {{step_name}}")
-            return True
-        except Exception as e:
-            self.log_progress(f"Failed: {{step_name}} - {{e}}")
-            return False
-
-    def execute(self) -> bool:
-        """
-        Execute main task logic
-
-        Returns:
-            Whether the task was successfully completed
-        """
-        self.log_progress("=== Resear Pro Task Executor Started ===")
-        self.log_progress(f"Task description: {self.prompt}")
-        self.log_progress(f"Project name: {{self.config['project']['name']}}")
-
-        # Define execution steps
-        steps = [
-            ("Environment initialization", 1.0),
-            ("Configuration validation", 0.5),
-            ("Dependency check", 1.0),
-            ("Core logic execution", 2.0),
-            ("Result verification", 1.0),
-            ("Cleanup and optimization", 0.5)
-        ]
-
-        success_count = 0
-
-        for i, (step_name, duration) in enumerate(steps, 1):
-            self.log_progress(f"Executing step {{i}}/{{len(steps)}}: {{step_name}}")
-
-            if self.execute_step(step_name, duration):
-                success_count += 1
-            else:
-                self.log_progress(f"Step failed, but continuing execution...")
-
-        # Generate execution report
-        execution_time = (datetime.now() - self.start_time).total_seconds()
-        success_rate = (success_count / len(steps)) * 100
-
-        self.log_progress("=== Execution completed ===")
-        self.log_progress(f"Total steps: {{len(steps)}}")
-        self.log_progress(f"Successful steps: {{success_count}}")
-        self.log_progress(f"Success rate: {{success_rate:.1f}}%")
-        self.log_progress(f"Execution time: {{execution_time:.1f}}s")
-
-        return success_rate >= 80  # 80% or higher success rate is considered successful
-
-def main():
-    """Main function"""
-    print("Starting Resear Pro Task Executor...")
-
-    executor = TaskExecutor()
-    success = executor.execute()
-
-    if success:
-        print("\\n🎉 Task executed successfully!")
-        exit(0)
-    else:
-        print("\\n❌ Task execution failed")
-        exit(1)
-
-if __name__ == "__main__":
-    main()
-'''
-
-            py_id = self.emit_activity("file", "Creating main program file", filename="main.py", status="in-progress")
+            md_id = self.emit_activity("file", "Creating multimedia demonstration with real sources",
+                                       filename="demo_report.md", status="in-progress")
             self.wait_if_paused(1)
-            self.emit_file_update("main.py", python_content)
-            cmd = "touch main.py && chmod +x main.py"
-            self.emit_terminal_output(cmd, "Python script created and made executable")
-            self.update_activity_status(py_id, "completed")
+            self.emit_file_update("demo_report.md", markdown_content)
+            self.update_activity_status(md_id, "completed")
 
-            # 6. 执行主要任务步骤
+            # 7. 执行主要任务步骤
             steps = [
-                ("thinking", "Developing detailed execution plan", 2),
-                ("command", "Installing project dependencies", "pip install -r requirements.txt"),
-                ("edit", "Updating task progress", "todo.md"),
-                ("command", "Running code analysis", "python -m flake8 main.py"),
-                ("browse", "Viewing project documentation", "file:///docs/project-guide.md"),
-                ("command", "Executing main program", "python main.py"),
-                ("thinking", "Verifying execution results", 2),
-                ("edit", "Updating final status", "todo.md"),
+                ("thinking", "Verifying multimedia URL accessibility", 2),
+                ("command", "Testing PDF document access", "curl -I https://openreview.net/pdf?id=bjcsVLoHYs"),
+                ("edit", "Updating task progress with live content", "todo.md"),
+                ("command", "Verifying image accessibility",
+                 "curl -I https://bianxieai.com/wp-content/uploads/2024/05/bianxieai.png"),
+                ("browse", "Testing multimedia gallery view", "file:///demo_report.md"),
+                ("command", "Running multimedia integration tests", "python test_multimedia.py"),
+                ("thinking", "Finalizing real multimedia demonstration", 2),
+                ("edit", "Completing live demo setup", "demo_report.md"),
             ]
 
             for i, (step_type, step_text, *args) in enumerate(steps, 1):
@@ -487,51 +491,38 @@ if __name__ == "__main__":
 
                 if step_type == "command":
                     command = args[0] if args else ""
-                    # 生成不同命令的模拟输出
-                    if "pip install" in command:
-                        output = """Collecting packages...
-Looking in indexes: https://pypi.org/simple/
-Collecting flask
-  Downloading Flask-2.3.3-py3-none-any.whl (96 kB)
-Collecting requests
-  Downloading requests-2.31.0-py3-none-any.whl (62 kB)
-Installing collected packages: flask, requests
-Successfully installed flask-2.3.3 requests-2.31.0"""
-                    elif "flake8" in command:
-                        output = """Checking Python code style...
-main.py:1:1: E302 expected 2 blank lines, found 1
-main.py:45:80: E501 line too long (85 > 79 characters)
-2 warnings found, but code quality is acceptable."""
-                    elif "python main.py" in command:
-                        output = f"""Starting Resear Pro Task Executor...
-=== Resear Pro Task Executor Started ===
-[{time.strftime('%H:%M:%S')}] Task description: {self.prompt}
-[{time.strftime('%H:%M:%S')}] Project name: Resear Pro Task
-[{time.strftime('%H:%M:%S')}] Executing step 1/6: Environment initialization
-[{time.strftime('%H:%M:%S')}] Step 1: Starting: Environment initialization
-[{time.strftime('%H:%M:%S')}] Step 1: Completed: Environment initialization
-[{time.strftime('%H:%M:%S')}] Executing step 2/6: Configuration validation
-[{time.strftime('%H:%M:%S')}] Step 2: Starting: Configuration validation
-[{time.strftime('%H:%M:%S')}] Step 2: Completed: Configuration validation
-[{time.strftime('%H:%M:%S')}] Executing step 3/6: Dependency check
-[{time.strftime('%H:%M:%S')}] Step 3: Starting: Dependency check
-[{time.strftime('%H:%M:%S')}] Step 3: Completed: Dependency check
-[{time.strftime('%H:%M:%S')}] Executing step 4/6: Core logic execution
-[{time.strftime('%H:%M:%S')}] Step 4: Starting: Core logic execution
-[{time.strftime('%H:%M:%S')}] Step 4: Completed: Core logic execution
-[{time.strftime('%H:%M:%S')}] Executing step 5/6: Result verification
-[{time.strftime('%H:%M:%S')}] Step 5: Starting: Result verification
-[{time.strftime('%H:%M:%S')}] Step 5: Completed: Result verification
-[{time.strftime('%H:%M:%S')}] Executing step 6/6: Cleanup and optimization
-[{time.strftime('%H:%M:%S')}] Step 6: Starting: Cleanup and optimization
-[{time.strftime('%H:%M:%S')}] Step 6: Completed: Cleanup and optimization
-=== Execution completed ===
-[{time.strftime('%H:%M:%S')}] Total steps: 6
-[{time.strftime('%H:%M:%S')}] Successful steps: 6
-[{time.strftime('%H:%M:%S')}] Success rate: 100.0%
-[{time.strftime('%H:%M:%S')}] Execution time: 6.1s
+                    if "curl -I" in command and "openreview.net" in command:
+                        output = """HTTP/2 200 OK
+content-type: application/pdf
+content-length: 2847392
+server: nginx
+access-control-allow-origin: *
+✅ PDF document accessible and ready for viewing
+📄 Research paper loaded successfully"""
+                    elif "curl -I" in command and "bianxieai.com" in command:
+                        output = """HTTP/1.1 200 OK
+content-type: image/png
+content-length: 45681
+server: Apache
+cache-control: public, max-age=31536000
+✅ Image file accessible and ready for display
+🖼️ Brand logo loaded successfully"""
+                    elif "test_multimedia.py" in command:
+                        output = f"""Testing Real Multimedia Integration...
+✅ PDF Viewer: Successfully loaded OpenReview paper
+✅ Image Display: Brand logo rendered correctly  
+✅ SVG Charts: Interactive graphics working
+✅ Markdown Preview: Media links properly embedded
+✅ Tab Management: Multiple file types supported
 
-🎉 Task executed successfully!"""
+=== Multimedia Test Results ===
+PDF Loading: ✅ PASS (2.3s)
+Image Loading: ✅ PASS (0.8s) 
+SVG Rendering: ✅ PASS (0.2s)
+URL Validation: ✅ PASS
+Integration: ✅ PASS
+
+All real multimedia features working perfectly! 🎉"""
                     else:
                         output = f"Command executed: {command}\\nOperation completed successfully."
 
@@ -540,23 +531,22 @@ main.py:45:80: E501 line too long (85 > 79 characters)
 
                 elif step_type == "edit":
                     if "todo.md" in args[0]:
-                        if i <= 3:
-                            # 第一次更新
+                        if i <= 4:
                             updated_todo = self.file_content.replace(
-                                "- [ ] Develop execution plan", "- [x] Develop execution plan"
+                                "- [ ] Create real multimedia demos", "- [x] Create real multimedia demos"
                             ).replace(
-                                "- [ ] Create project files", "- [x] Create project files"
+                                "- [ ] Generate PDF and image content", "- [x] Generate PDF and image content"
                             )
                         else:
-                            # 最终更新
                             updated_todo = self.file_content.replace(
-                                "- [ ] Implement core functionality", "- [x] Implement core functionality"
+                                "- [ ] Create interactive examples", "- [x] Create interactive examples"
                             ).replace(
-                                "- [ ] Test and verify", "- [x] Test and verify"
+                                "- [ ] Test multimedia support", "- [x] Test multimedia support"
                             ).replace(
                                 "- [ ] Complete task", "- [x] Complete task"
                             ).replace(
-                                "Status: In progress", f"Status: Completed\\nCompletion time: {time.strftime('%Y-%m-%d %H:%M:%S')}"
+                                "Status: In progress with real multimedia content",
+                                f"Status: ✅ Completed with live multimedia URLs\\nCompletion time: {time.strftime('%Y-%m-%d %H:%M:%S')}"
                             )
 
                         self.file_content = updated_todo
@@ -571,66 +561,127 @@ main.py:45:80: E501 line too long (85 > 79 characters)
 
                 self.wait_if_paused(0.5)
 
-            # 7. 创建额外的文件来丰富文件结构
-            # 创建 requirements.txt
-            requirements_content = """Flask==2.3.3
+            # 8. 创建requirements.txt
+            requirements_content = """# Core dependencies
+Flask==2.3.3
 requests==2.31.0
 flake8==6.0.0
-pytest==7.4.0"""
-            req_id = self.emit_activity("file", "Creating dependencies file", filename="requirements.txt", status="in-progress")
+pytest==7.4.0
+
+# Multimedia support  
+Pillow==9.5.0
+PyPDF2==3.0.1
+
+# Optional enhancements
+matplotlib==3.7.2
+plotly==5.15.0"""
+
+            req_id = self.emit_activity("file", "Creating dependencies file", filename="requirements.txt",
+                                        status="in-progress")
             self.wait_if_paused(0.5)
             self.emit_file_update("requirements.txt", requirements_content)
             self.update_activity_status(req_id, "completed")
 
-            # 创建 README.md
-            readme_content = f"""# Resear Pro Task
+            # 9. 创建README.md
+            readme_content = f"""# Resear Pro Task - Real Multimedia Edition
 
 ## Task Description
 {self.prompt}
 
-## Project Structure
+## 🎯 Live Demo Features
+- 📄 **Real PDF Viewing**: OpenReview research paper
+- 🖼️ **Live Image Display**: Web-hosted brand logo
+- 📊 **Interactive Charts**: SVG-based data visualization
+- 💬 **Real-time Chat**: Live conversation interface
+
+## 📂 Project Structure
 ```
 resear-pro-task/
-├── todo.md          # Task checklist
-├── config.json      # Project configuration
-├── main.py          # Main program
-├── requirements.txt # Python dependencies
-└── README.md        # Project documentation
+├── todo.md              # Task checklist
+├── config.json          # Configuration with real URLs
+├── demo_report.md       # Live multimedia showcase
+├── research_paper.pdf   # https://openreview.net/pdf?id=bjcsVLoHYs
+├── brand_logo.png       # https://bianxieai.com/wp-content/uploads/2024/05/bianxieai.png
+├── demo_chart.svg       # Interactive data chart
+├── requirements.txt     # Dependencies
+└── README.md           # This documentation
 ```
 
-## How to Run
+## 🌐 Live Demo URLs
+- **PDF Document**: https://openreview.net/pdf?id=bjcsVLoHYs
+- **Brand Image**: https://bianxieai.com/wp-content/uploads/2024/05/bianxieai.png
+
+## 🚀 How to Run
 ```bash
+# Install dependencies
 pip install -r requirements.txt
-python main.py
+
+# Start the multimedia demo
+python app.py
 ```
 
-## Generated at
-{time.strftime('%Y-%m-%d %H:%M:%S')}
+## 📊 Real-time Features
+- Live PDF document viewing with navigation
+- Direct image loading from web URLs
+- Interactive SVG chart rendering
+- Real-time chat and collaboration
+
+## Generated Information
+- **Created**: {time.strftime('%Y-%m-%d %H:%M:%S')}
+- **Task ID**: {self.task_id[:8]}...
+- **Status**: ✅ Completed Successfully
+- **Media Files**: {len(created_media)} live files created
+- **Real URLs**: All multimedia content loaded from web
+
+---
+*Generated by Resear Pro AI Assistant with Live Multimedia URLs* 🚀
 """
-            readme_id = self.emit_activity("file", "Creating project README file", filename="README.md", status="in-progress")
+            readme_id = self.emit_activity("file", "Creating project README with live URLs", filename="README.md",
+                                           status="in-progress")
             self.wait_if_paused(0.5)
             self.emit_file_update("README.md", readme_content)
             self.update_activity_status(readme_id, "completed")
 
-            # 8. 任务完成
-            final_id = self.emit_activity("thinking", "Generating final report and completing task", status="in-progress")
-            self.wait_if_paused(1)
+            # 10. 任务完成
+            final_id = self.emit_activity("thinking",
+                                          "Finalizing real multimedia task and generating completion report",
+                                          status="in-progress")
+            self.wait_if_paused(2)
 
             # 发送最终总结
             self.emit_terminal_output(
-                "echo 'Task execution completed successfully'",
+                "echo 'Real multimedia task execution completed successfully'",
                 f"""
-=== Resear Pro Task Execution Report ===
+=== Resear Pro Real Multimedia Task Execution Report ===
 Task ID: {self.task_id}
 Start time: {time.strftime('%Y-%m-%d %H:%M:%S')}
 Task description: {self.prompt}
-Created files: {len(self.all_files)} ({', '.join(self.all_files.keys())})
+
+📊 **Statistics**
+Created files: {len(self.all_files)} total
+├── Text files: {len([f for f in self.all_files.keys() if f.endswith(('.md', '.txt', '.py', '.json'))])}
+├── Live media files: {len(created_media)}
+└── Documentation: {len([f for f in self.all_files.keys() if f.startswith('README') or f.startswith('demo_')])}
+
+🌐 **Live Multimedia Sources**
+📄 PDF: https://openreview.net/pdf?id=bjcsVLoHYs
+🖼️ Image: https://bianxieai.com/wp-content/uploads/2024/05/bianxieai.png
+📊 Charts: Interactive SVG graphics
+
+🎯 **Features Implemented**
+✅ Real PDF document viewer integration
+✅ Live image display from web URLs
+✅ Interactive SVG chart rendering
+✅ Markdown preview with embedded media
+✅ Multi-tab file management system
+✅ Real-time conversation interface
+
 Execution steps: {len(steps)}
 Execution log: {len(self.execution_log)} entries
-Status: ✅ Successfully completed
+Status: ✅ Successfully completed with live multimedia URLs
 
-All files have been saved and execution log has been recorded.
-Task execution completed successfully
+🎉 All real multimedia files ready for viewing! 🎉
+Visit the dashboard to interact with live PDFs and images.
 """
             )
 
@@ -672,34 +723,45 @@ def create_task_export_zip(task_executor: TaskExecutor) -> bytes:
             "total_files": len(task_executor.all_files),
             "total_activities": len(task_executor.execution_log),
             "file_list": list(task_executor.all_files.keys()),
-            "file_structure": task_executor.file_structure
+            "file_structure": task_executor.file_structure,
+            "multimedia_support": True,
+            "real_urls": True,
+            "pdf_source": "https://openreview.net/pdf?id=bjcsVLoHYs",
+            "image_source": "https://bianxieai.com/wp-content/uploads/2024/05/bianxieai.png"
         }
         zip_file.writestr("task_info.json", json.dumps(task_info, indent=2, ensure_ascii=False))
 
         # 4. 添加README说明文件
-        readme_content = f"""# Resear Pro Task Export
+        readme_content = f"""# Resear Pro Real Multimedia Task Export
 
 ## Task Information
 - Task ID: {task_executor.task_id}
 - Task Description: {task_executor.prompt}
 - Export Time: {time.strftime('%Y-%m-%d %H:%M:%S')}
+- Real Multimedia: ✅ Live URLs Enabled
 
 ## File Structure
 - `files/` - All files created during task execution
 - `execution_log.json` - Detailed execution log
-- `task_info.json` - Basic task information
+- `task_info.json` - Task information and metadata
 - `README.md` - This documentation file
 
 ## Created Files
 {chr(10).join(f"- {filename}" for filename in task_executor.all_files.keys())}
 
+## Live Multimedia Sources
+📄 **PDF Document**: https://openreview.net/pdf?id=bjcsVLoHYs
+🖼️ **Brand Image**: https://bianxieai.com/wp-content/uploads/2024/05/bianxieai.png
+📊 **Interactive Charts**: SVG-based data visualization
+
 ## Usage Instructions
-1. All created files are in the `files/` directory
-2. Check `execution_log.json` for detailed execution process
-3. These files can be used directly or edited further
+1. Extract all files from this archive
+2. All multimedia files contain live URLs
+3. Check `execution_log.json` for detailed process
+4. Media content loads directly from web sources
 
 ---
-Generated by Resear Pro AI Assistant
+Generated by Resear Pro AI Assistant - Real Multimedia Edition 🚀
 """
         zip_file.writestr("README.md", readme_content)
 
@@ -733,7 +795,9 @@ def create_task():
         'prompt': prompt,
         'attachments': attachments,
         'status': 'created',
-        'created_at': time.time()
+        'created_at': time.time(),
+        'multimedia_support': True,
+        'real_urls': True
     }
 
     # 创建并启动任务执行器
@@ -744,11 +808,13 @@ def create_task():
     thread.daemon = True
     thread.start()
 
-    logger.info(f"Created task {task_id}: {prompt[:50]}...")
+    logger.info(f"Created real multimedia task {task_id}: {prompt[:50]}...")
 
     return jsonify({
         'task_id': task_id,
-        'status': 'created'
+        'status': 'created',
+        'multimedia_support': True,
+        'real_urls': True
     })
 
 
@@ -766,7 +832,7 @@ def stream_task(task_id):
             return
 
         task_queue = task_queues[task_id]
-        logger.info(f"Started streaming for task {task_id}")
+        logger.info(f"Started streaming for real multimedia task {task_id}")
 
         try:
             while True:
@@ -781,7 +847,7 @@ def stream_task(task_id):
                         # 发送最终状态消息
                         final_status = message.get('data', {}).get('status')
                         yield f"data: {json.dumps({'type': 'connection_close', 'reason': f'task_{final_status}'})}\n\n"
-                        logger.info(f"Task {task_id} {final_status}, closing stream")
+                        logger.info(f"Real multimedia task {task_id} {final_status}, closing stream")
                         break
 
                 except queue.Empty:
@@ -793,14 +859,7 @@ def stream_task(task_id):
             logger.error(f"Stream error for task {task_id}: {str(e)}")
             yield f"data: {json.dumps({'type': 'error', 'message': 'Stream connection error'})}\n\n"
         finally:
-            # 清理资源
-            #if task_id in task_queues:
-                #del task_queues[task_id]
-            #if task_id in active_tasks:
-                #del active_tasks[task_id]
-            #if task_id in task_executors:
-                #del task_executors[task_id]
-            logger.info(f"Cleaned up resources for task {task_id}")
+            logger.info(f"Cleaned up resources for real multimedia task {task_id}")
 
     return Response(
         generate(),
@@ -856,12 +915,12 @@ def export_task(task_id):
             zip_data,
             mimetype='application/zip',
             headers={
-                'Content-Disposition': f'attachment; filename=resear-pro-task-{task_id}.zip',
+                'Content-Disposition': f'attachment; filename=resear-pro-real-multimedia-task-{task_id}.zip',
                 'Content-Length': str(len(zip_data))
             }
         )
 
-        logger.info(f"Exported task {task_id} ({len(zip_data)} bytes)")
+        logger.info(f"Exported real multimedia task {task_id} ({len(zip_data)} bytes)")
         return response
 
     except Exception as e:
@@ -884,7 +943,9 @@ def get_task(task_id):
             'is_paused': executor.is_paused,
             'files_created': len(executor.all_files),
             'activities_count': len(executor.execution_log),
-            'file_structure': executor.file_structure
+            'file_structure': executor.file_structure,
+            'multimedia_support': True,
+            'real_urls': True
         })
 
     return jsonify(task_info)
@@ -904,20 +965,25 @@ def health_check():
         'active_tasks': len(active_tasks),
         'running_executors': len(task_executors),
         'timestamp': time.time(),
-        'version': '1.0.0'
+        'version': '2.0.0',
+        'features': ['real-multimedia', 'live-urls', 'streaming', 'real-time', 'multi-format']
     })
 
 
 # ==================== 应用启动 ====================
 
 if __name__ == '__main__':
-    logger.info("Starting Resear Pro AI Assistant Backend...")
+    logger.info("Starting Resear Pro AI Assistant Backend with Real Multimedia URLs...")
     logger.info("API endpoints:")
-    logger.info("  POST /api/tasks - Create new task")
+    logger.info("  POST /api/tasks - Create new real multimedia task")
     logger.info("  GET  /api/tasks/<id>/stream - Stream task progress")
     logger.info("  POST /api/tasks/<id>/pause - Pause/Resume task")
     logger.info("  GET  /api/tasks/<id>/export - Export task files")
     logger.info("  GET  /api/tasks/<id> - Get task info")
     logger.info("  GET  /api/health - Health check")
+    logger.info("Real Multimedia Sources:")
+    logger.info("  PDF: https://openreview.net/pdf?id=bjcsVLoHYs")
+    logger.info("  Image: https://bianxieai.com/wp-content/uploads/2024/05/bianxieai.png")
+    logger.info("Features: Live PDF viewing, Real image display, Interactive charts")
 
     app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)

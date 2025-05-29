@@ -3,38 +3,36 @@
 import React, { useState, useEffect, useRef } from "react"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
-import { Terminal, FileText, Eye, ArrowDown, ArrowUp, Edit, Loader2, CheckCircle, XCircle, GitCommit, Code2, FolderOpen, Send } from "lucide-react"
+import { Terminal, FileText, Eye, ArrowDown, ArrowUp, Edit, Loader2, CheckCircle, XCircle, GitCommit, Code2, FolderOpen, Send, User, Bot } from "lucide-react"
 import { Activity } from "@/lib/api"
 
 interface DashboardContentProps {
   activeTask: string
-  commandOutput: string[] // This prop seems unused currently
-  activities: Activity[] // This will be the unified list
+  commandOutput: string[]
+  activities: Activity[]
   taskStatus: string
   onAddUserMessage: (text: string) => void;
-  // dialogMessages prop removed
-  isViewingHistory?: boolean; 
+  isViewingHistory?: boolean;
 }
 
-export function DashboardContent({ 
-  activeTask, 
-  commandOutput, 
-  activities, // Unified list
-  taskStatus, 
+export function DashboardContent({
+  activeTask,
+  commandOutput,
+  activities,
+  taskStatus,
   onAddUserMessage,
-  // dialogMessages prop removed
   isViewingHistory = false
 }: DashboardContentProps) {
-  const dialogDisplayRef = useRef<HTMLDivElement>(null); // Single ref for the unified scrollable area
+  const dialogDisplayRef = useRef<HTMLDivElement>(null);
   const [userInput, setUserInput] = useState("");
-  // autoScroll state and activitiesEndRef removed
+  const [isInputFocused, setIsInputFocused] = useState(false);
 
   // Auto-scroll for the unified dialog/activity display area
   useEffect(() => {
     if (dialogDisplayRef.current) {
       dialogDisplayRef.current.scrollTop = dialogDisplayRef.current.scrollHeight;
     }
-  }, [activities]); // Scroll when unified activities list changes
+  }, [activities]);
 
   const getActivityIcon = (type: string) => {
     const iconClass = "h-4 w-4"
@@ -90,12 +88,24 @@ export function DashboardContent({
     return labels[type] || type
   }
 
-  // handleScroll for autoScroll state is removed as not directly applicable to the new unified view's auto-scroll-to-bottom logic
+  const handleSendMessage = () => {
+    if (userInput.trim() && !isViewingHistory) {
+      onAddUserMessage(userInput.trim());
+      setUserInput("");
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
 
   return (
-    <div className="h-full flex flex-col">
-      {/* 顶部标题栏 - GitHub 风格 */}
-      <div className="flex items-center border-b border-slate-300 px-4 h-10">
+    <div className="h-full flex flex-col bg-white">
+      {/* 顶部标题栏 */}
+      <div className="flex items-center border-b border-slate-300 px-4 h-10 bg-slate-50">
         <div className="flex items-center justify-between w-full">
           <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
             <Code2 className="h-4 w-4" />
@@ -107,11 +117,18 @@ export function DashboardContent({
         </div>
       </div>
 
-      {/* Unified Conversation/Activity Area */}
-      <div ref={dialogDisplayRef} className="flex-1 flex flex-col overflow-y-auto bg-slate-50"> {/* Main scroller */}
-        {/* Messages and Activities Display (grows to fill space) */}
+      {/* 统一的对话和活动区域 */}
+      <div
+        ref={dialogDisplayRef}
+        className="flex-1 flex flex-col overflow-y-auto bg-slate-50 custom-scrollbar"
+        style={{
+          scrollbarWidth: 'thin',
+          scrollbarColor: '#cbd5e1 #f1f5f9'
+        }}
+      >
+        {/* 消息和活动显示区域 */}
         <div className="flex-grow p-4 space-y-4">
-          {activities.length === 0 && !isViewingHistory ? ( // Show different message if viewing history and it's empty
+          {activities.length === 0 && !isViewingHistory ? (
             <div className="flex flex-col items-center justify-center h-full text-center p-8">
               <div className="w-12 h-12 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin mb-4"></div>
               <h3 className="text-base font-medium text-slate-700 mb-2">Waiting for task to start</h3>
@@ -124,25 +141,43 @@ export function DashboardContent({
           ) : (
             activities.map((activity, index) => {
               if (activity.speaker === 'user' || activity.type === 'user_input') {
-                // User Message Styling
+                // 用户消息样式 - 恢复原来的样式
                 return (
-                  <div key={activity.id || `user-${index}`} className="flex justify-end ml-10"> {/* Added ml-10 for indentation */}
-                    <div className="max-w-[85%] p-2 px-3 rounded-lg text-sm shadow-sm bg-blue-100 text-blue-900"> {/* Darker blue text */}
-                      <p className="whitespace-pre-wrap break-words">{activity.text}</p>
-                      <p className="text-xs mt-1 text-blue-700 text-right"> {/* Darker timestamp */}
-                        {formatTimestamp(activity.timestamp)}
-                      </p>
+                  <div key={activity.id || `user-${index}`} className="mb-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                        <User className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 shadow-sm">
+                          <div className="flex items-start justify-between mb-1">
+                            <span className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-0.5 rounded">
+                              User Message
+                            </span>
+                            <span className="text-xs text-blue-600">
+                              {formatTimestamp(activity.timestamp)}
+                            </span>
+                          </div>
+                          <p className="text-sm text-blue-900 whitespace-pre-wrap break-words">
+                            {activity.text}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );
-              } else { // AI Activity Styling
+              } else {
+                // AI活动样式 - 保持原来的垂直条纹样式
                 return (
-                  <div key={activity.id || `ai-${index}`} className="mr-10"> {/* Added mr-10 for indentation */}
+                  <div key={activity.id || `ai-${index}`} className="mb-4">
                     <div className="flex items-start gap-3">
                       <div className="flex flex-col items-center flex-shrink-0">
                         <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
                           {getActivityIcon(activity.type)}
                         </div>
+                        {index < activities.length - 1 && (
+                          <div className="w-0.5 bg-slate-200 flex-1 mt-2" style={{ minHeight: '20px' }}></div>
+                        )}
                       </div>
                       <div className="flex-1 -mt-1">
                         <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
@@ -181,9 +216,50 @@ export function DashboardContent({
           )}
         </div>
 
-        {/* User Input Area (sticks to bottom of this scrollable container) */}
-        <div className="sticky bottom-0 border-t border-slate-300 p-4 bg-white mt-auto"> {/* Added mt-auto */}
-// Removed the old footer that showed auto-scroll status
+        {/* 用户输入区域 - 固定在底部 */}
+        <div className="sticky bottom-0 border-t border-slate-300 p-4 bg-white shadow-sm">
+          <div className="flex items-end gap-3">
+            <div className="flex-1">
+              <Textarea
+                value={userInput}
+                onChange={(e) => setUserInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onFocus={() => setIsInputFocused(true)}
+                onBlur={() => setIsInputFocused(false)}
+                placeholder={isViewingHistory ? "Viewing history mode - input disabled" : "Type a message..."}
+                disabled={isViewingHistory}
+                className={`
+                  min-h-[40px] max-h-[120px] resize-none 
+                  border border-slate-300 rounded-xl
+                  focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                  transition-all duration-200
+                  ${isInputFocused ? 'shadow-md' : 'shadow-sm'}
+                  ${isViewingHistory ? 'bg-slate-100 text-slate-500' : 'bg-white'}
+                `}
+              />
+            </div>
+            <Button
+              onClick={handleSendMessage}
+              disabled={!userInput.trim() || isViewingHistory}
+              size="sm"
+              className={`
+                h-10 w-10 rounded-xl p-0 transition-all duration-200
+                ${userInput.trim() && !isViewingHistory 
+                  ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-md hover:shadow-lg' 
+                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                }
+              `}
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
+          {!isViewingHistory && (
+            <p className="text-xs text-slate-500 mt-2">
+              Press Enter to send, Shift+Enter for new line
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

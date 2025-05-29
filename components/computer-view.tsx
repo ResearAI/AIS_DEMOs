@@ -1,27 +1,25 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react" // Removed useMemo, Added useRef
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent } from "@/components/ui/tabs" // TabsList and TabsTrigger will be removed
 import { Slider } from "@/components/ui/slider"
-import { Terminal, FileText, FolderTree, ChevronRight, ChevronDown, File, Folder, Info, X, Plus, ArrowLeft, ArrowRight, Save, RotateCcw, Eye, EyeOff } from "lucide-react" // Removed MessageCircle
+import { Terminal, FileText, FolderTree, ChevronRight, ChevronDown, File, Folder, Info, X, Plus, ArrowLeft, ArrowRight, Save, RotateCcw, Eye, EyeOff, ChevronLeft, Download, Play, Pause } from "lucide-react"
 import { FileStructureNode } from "@/lib/api"
 import { marked } from 'marked'
 import Prism from 'prismjs';
-// Add specific language imports if not all are bundled by default or for tree shaking
 import 'prismjs/components/prism-python';
 import 'prismjs/components/prism-javascript';
 import 'prismjs/components/prism-typescript';
 import 'prismjs/components/prism-css';
 import 'prismjs/components/prism-json';
-// Choose a Prism theme. Ensure this is handled by the build process.
-import 'prismjs/themes/prism-coy.css'; // Changed to a light theme
+import 'prismjs/themes/prism-coy.css';
 
 interface FileTab {
   id: string
   filename: string
   content: string
   hasChanges: boolean
+  fileType: 'text' | 'image' | 'video' | 'pdf' | 'markdown'
 }
 
 interface ComputerViewProps {
@@ -32,12 +30,211 @@ interface ComputerViewProps {
   taskStatus?: string
   terminalOutput?: string[]
   fileStructure?: FileStructureNode | null
-  // dialogMessages prop removed
   isViewingHistory?: boolean;
   historyLength?: number;
   currentHistoryIndexValue?: number;
   onHistoryChange?: (newIndex: number) => void;
 }
+
+// 检测文件类型的函数
+const getFileType = (filename: string): 'text' | 'image' | 'video' | 'pdf' | 'markdown' => {
+  const extension = filename.split('.').pop()?.toLowerCase() || '';
+
+  if (extension === 'md') return 'markdown';
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension)) return 'image';
+  if (['mp4', 'webm', 'ogg', 'avi', 'mov'].includes(extension)) return 'video';
+  if (extension === 'pdf') return 'pdf';
+  return 'text';
+};
+
+// PDF查看器组件（使用iframe，避免依赖问题）
+const PDFViewer = ({ src, filename }: { src: string; filename: string }) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  return (
+    <div className="h-full flex flex-col bg-white">
+      <div className="flex items-center justify-between p-3 border-b border-slate-300 bg-slate-50">
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-red-600" />
+          <span className="text-sm font-medium">{filename}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.open(src, '_blank')}
+          >
+            <Download className="h-4 w-4 mr-1" />
+            Open External
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex-1 relative">
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-slate-100">
+            <div className="text-center text-slate-500">
+              <div className="w-8 h-8 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin mx-auto mb-2"></div>
+              <p>Loading PDF...</p>
+            </div>
+          </div>
+        )}
+
+        {hasError && (
+          <div className="absolute inset-0 flex items-center justify-center bg-slate-100">
+            <div className="text-center text-slate-500">
+              <FileText className="h-12 w-12 mx-auto mb-2 text-slate-300" />
+              <p className="text-red-600">Failed to load PDF</p>
+              <p className="text-sm mt-1">Click "Open External" to view</p>
+            </div>
+          </div>
+        )}
+
+        <iframe
+          src={src}
+          className="w-full h-full border-0"
+          title={`PDF viewer for ${filename}`}
+          onLoad={() => setIsLoading(false)}
+          onError={() => {
+            setIsLoading(false);
+            setHasError(true);
+          }}
+        />
+      </div>
+    </div>
+  );
+};
+
+// 图片查看器组件
+const ImageViewer = ({ src, filename }: { src: string; filename: string }) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string>('');
+
+  useEffect(() => {
+    // 处理不同的图片源格式
+    if (src.startsWith('data:')) {
+      setImageUrl(src);
+    } else if (src.startsWith('http')) {
+      setImageUrl(src);
+    } else {
+      // 假设是文件内容，创建SVG
+      const svgContent = `<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100%" height="100%" fill="#f0f0f0"/>
+        <text x="50%" y="40%" font-family="Arial" font-size="18" fill="#333333" text-anchor="middle">${filename}</text>
+        <text x="50%" y="60%" font-family="Arial" font-size="12" fill="#666666" text-anchor="middle">Demo Image</text>
+      </svg>`;
+      const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+      setImageUrl(URL.createObjectURL(blob));
+    }
+  }, [src, filename]);
+
+  return (
+    <div className="h-full flex flex-col bg-white">
+      <div className="flex items-center justify-between p-3 border-b border-slate-300 bg-slate-50">
+        <div className="flex items-center gap-2">
+          <Eye className="h-4 w-4 text-green-600" />
+          <span className="text-sm font-medium">{filename}</span>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => window.open(imageUrl, '_blank')}
+        >
+          <Download className="h-4 w-4 mr-1" />
+          View Full Size
+        </Button>
+      </div>
+      <div className="flex-1 flex items-center justify-center p-4 overflow-auto image-viewer-container">
+        {hasError ? (
+          <div className="text-center text-slate-500">
+            <Eye className="h-12 w-12 mx-auto mb-2 text-slate-300" />
+            <p>Failed to load image</p>
+            <p className="text-sm mt-1">{filename}</p>
+          </div>
+        ) : (
+          <img
+            src={imageUrl}
+            alt={filename}
+            className="max-w-full max-h-full object-contain shadow-lg rounded-lg"
+            onLoad={() => setIsLoading(false)}
+            onError={() => {
+              setIsLoading(false);
+              setHasError(true);
+            }}
+            style={{ display: isLoading ? 'none' : 'block' }}
+          />
+        )}
+        {isLoading && (
+          <div className="text-center text-slate-500">
+            <div className="w-8 h-8 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin mx-auto mb-2"></div>
+            <p>Loading image...</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// 视频播放器组件
+const VideoPlayer = ({ src, filename }: { src: string; filename: string }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  const togglePlay = () => {
+    if (videoRef.current) {
+      if (isPlaying) {
+        videoRef.current.pause();
+      } else {
+        videoRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  return (
+    <div className="h-full flex flex-col bg-black">
+      <div className="flex items-center justify-between p-3 border-b border-slate-700 bg-slate-800">
+        <div className="flex items-center gap-2">
+          <Play className="h-4 w-4 text-blue-400" />
+          <span className="text-sm font-medium text-white">{filename}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={togglePlay}
+            className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+          >
+            {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.open(src, '_blank')}
+            className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+          >
+            <Download className="h-4 w-4 mr-1" />
+            Download
+          </Button>
+        </div>
+      </div>
+      <div className="flex-1 flex items-center justify-center">
+        <video
+          ref={videoRef}
+          src={src}
+          className="max-w-full max-h-full"
+          controls
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+        >
+          Your browser does not support the video tag.
+        </video>
+      </div>
+    </div>
+  );
+};
 
 export function ComputerView({
   currentFile,
@@ -47,124 +244,116 @@ export function ComputerView({
   taskStatus = 'idle',
   terminalOutput = [],
   fileStructure = null,
-  // dialogMessages prop removed from destructuring
   isViewingHistory = false,
   historyLength = 0,
   currentHistoryIndexValue = -1,
   onHistoryChange
 }: ComputerViewProps) {
-  const [selectedView, setSelectedView] = useState<string>('editing') // 'editing', 'terminal', 'info' - 'chat' removed
+  const [selectedView, setSelectedView] = useState<string>('editing')
   const [fileTabs, setFileTabs] = useState<FileTab[]>([])
   const [activeFileId, setActiveFileId] = useState<string>('')
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['resear-pro-task']))
-  const [fileContents, setFileContents] = useState<Map<string, string>>(new Map()) // Live content cache, might be redundant if fileTabs holds all content
+  const [fileContents, setFileContents] = useState<Map<string, string>>(new Map())
   const [originalFileContents, setOriginalFileContents] = useState<Map<string, string>>(new Map())
-  const [sliderValue, setSliderValue] = useState([50])
   const [showMarkdownPreview, setShowMarkdownPreview] = useState(true);
+  const [tabScrollPosition, setTabScrollPosition] = useState(0);
+  const [showToolsMenu, setShowToolsMenu] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const preRef = useRef<HTMLPreElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const terminalInputRef = useRef<HTMLInputElement>(null);
   const terminalDisplayRef = useRef<HTMLDivElement>(null);
-  // chatDisplayRef removed
+  const tabsContainerRef = useRef<HTMLDivElement>(null);
 
   const [terminalInputValue, setTerminalInputValue] = useState('');
   const [displayedTerminalOutput, setDisplayedTerminalOutput] = useState<string[]>([]);
 
-  // Initialize with current file
+  // 初始化当前文件
   useEffect(() => {
-    console.log('[ComputerView] Mount/Prop Effect (currentFile, fileContent, fileTabs):', 
-      'currentFile:', currentFile, 
-      'fileContent length:', fileContent?.length,
-      'isViewingHistory:', isViewingHistory
-    );
-    if (currentFile && fileContent !== undefined && fileContent !== null && !fileTabs.find(tab => tab.filename === currentFile) && !isViewingHistory) { // Allow empty string for fileContent
-      console.log('[ComputerView] Initializing new tab for currentFile:', currentFile, 'with content length:', fileContent.length);
+    if (currentFile && fileContent !== undefined && fileContent !== null && !fileTabs.find(tab => tab.filename === currentFile) && !isViewingHistory) {
+      const fileType = getFileType(currentFile);
       const newTab: FileTab = {
         id: `file-${Date.now()}`,
         filename: currentFile,
         content: fileContent,
-        hasChanges: false
+        hasChanges: false,
+        fileType
       }
       setFileTabs(prev => [...prev, newTab])
       setActiveFileId(newTab.id)
-      setSelectedView('editing') // Ensure view is set to editing
-      setFileContents(prev => {
-        const newMap = new Map(prev).set(currentFile, fileContent);
-        console.log('[ComputerView] Mount/Prop Effect - fileContents updated:', newMap);
-        return newMap;
-      });
-      // If it's a new tab being auto-opened, store its initial content as original
-      // The outer if already ensures !fileTabs.find(tab => tab.filename === currentFile)
-      setOriginalFileContents(prev => {
-        const newMap = new Map(prev).set(currentFile, fileContent);
-        console.log('[ComputerView] Mount/Prop Effect - originalFileContents updated:', newMap);
-        return newMap;
-      });
+      setSelectedView('editing')
+      setFileContents(prev => new Map(prev).set(currentFile, fileContent));
+      setOriginalFileContents(prev => new Map(prev).set(currentFile, fileContent));
     }
-  }, [currentFile, fileContent, fileTabs, isViewingHistory]) // Added isViewingHistory
+  }, [currentFile, fileContent, fileTabs, isViewingHistory])
 
-  // Update file content when it changes from server OR when fileContent prop changes while isLive
+  // 实时更新文件内容
   useEffect(() => {
-    console.log('[ComputerView] Live Update Effect (currentFile, fileContent, isLive):',
-      'currentFile:', currentFile,
-      'fileContent length:', fileContent?.length,
-      'isLive:', isLive,
-      'isViewingHistory:', isViewingHistory
-    );
-    if (currentFile && fileContent !== undefined && fileContent !== null && isLive && !isViewingHistory) { // Allow empty string for fileContent, only apply if live and not viewing history
-      console.log('[ComputerView] Live Update - Applying server content for:', currentFile, 'with content length:', fileContent.length);
-      // Update the live content cache
-      setFileContents(prev => {
-        const newMap = new Map(prev).set(currentFile, fileContent);
-        console.log('[ComputerView] Live Update - fileContents updated:', newMap);
-        return newMap;
-      });
+    if (currentFile && fileContent !== undefined && fileContent !== null && isLive && !isViewingHistory) {
+      setFileContents(prev => new Map(prev).set(currentFile, fileContent));
+      setOriginalFileContents(prevOrig => new Map(prevOrig).set(currentFile, fileContent));
 
-      // Server push becomes the new "original" baseline for this file
-      setOriginalFileContents(prevOrig => {
-        const newMap = new Map(prevOrig).set(currentFile, fileContent);
-        console.log('[ComputerView] Live Update - originalFileContents updated:', newMap);
-        return newMap;
-      });
-      
-      // Update tab content and reset hasChanges as server content is now the baseline
       setFileTabs(prev => prev.map(tab =>
         tab.filename === currentFile
-          ? { ...tab, content: fileContent, hasChanges: false } // Server push resets changes
+          ? { ...tab, content: fileContent, hasChanges: false }
           : tab
       ));
     }
-  }, [currentFile, fileContent, isLive]); // Removed originalFileContents dependency
+  }, [currentFile, fileContent, isLive]);
 
-  // Auto-switch to terminal when there's output
+  // 自动切换到终端
   useEffect(() => {
     if (terminalOutput.length > 0 && terminalOutput.length <= 2 && selectedView === 'editing') {
       setSelectedView('terminal')
     }
   }, [terminalOutput.length, selectedView])
 
-  // Effect to update displayedTerminalOutput when terminalOutput prop changes
+  // 更新终端输出
   useEffect(() => {
     setDisplayedTerminalOutput(terminalOutput || []);
   }, [terminalOutput]);
 
-  // Effect for auto-scrolling terminal
+  // 自动滚动终端
   useEffect(() => {
     if (selectedView === 'terminal' && terminalDisplayRef.current) {
       terminalDisplayRef.current.scrollTop = terminalDisplayRef.current.scrollHeight;
     }
   }, [displayedTerminalOutput, selectedView]);
 
-  // Effect for auto-scrolling chat - REMOVED
-
-  // Effect for auto-focusing terminal input
+  // 自动聚焦终端输入
   useEffect(() => {
     if (selectedView === 'terminal' && terminalInputRef.current) {
       terminalInputRef.current.focus();
     }
   }, [selectedView]);
+
+  // 点击外部关闭工具菜单
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showToolsMenu) {
+        setShowToolsMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showToolsMenu]);
+
+  // 文件标签滚动函数
+  const scrollTabs = (direction: 'left' | 'right') => {
+    if (tabsContainerRef.current) {
+      const scrollAmount = 200;
+      const newPosition = direction === 'left'
+        ? Math.max(0, tabScrollPosition - scrollAmount)
+        : tabScrollPosition + scrollAmount;
+
+      tabsContainerRef.current.scrollLeft = newPosition;
+      setTabScrollPosition(newPosition);
+    }
+  };
 
   const handleTerminalInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setTerminalInputValue(e.target.value);
@@ -175,40 +364,34 @@ export function ComputerView({
       e.preventDefault();
       const commandToDisplay = `> ${terminalInputValue}`;
       setDisplayedTerminalOutput(prevOutput => [...prevOutput, commandToDisplay]);
-      // TODO: Send command to backend: terminalInputValue
       console.log(`Terminal command submitted: ${terminalInputValue}`);
       setTerminalInputValue('');
     }
   };
 
   const handleFileClick = (filename: string) => {
-    console.log('[ComputerView] handleFileClick - filename:', filename);
-    // Check if file is already open
     const existingTab = fileTabs.find(tab => tab.filename === filename)
     if (existingTab) {
-      console.log('[ComputerView] handleFileClick - Tab already open:', existingTab.id);
       setActiveFileId(existingTab.id)
       setSelectedView('editing')
       return
     }
 
-    // Create new tab
     const contentFromCache = fileContents.get(filename);
-    console.log('[ComputerView] handleFileClick - Content from fileContents cache for', filename, 'length:', contentFromCache?.length);
-    const content = contentFromCache || '' // Use cached content or empty string
+    const content = contentFromCache || ''
+    const fileType = getFileType(filename);
 
     const newTab: FileTab = {
       id: `file-${Date.now()}`,
       filename,
-      content, // Use content from cache
-      hasChanges: false // New tab shouldn't have changes initially based on cache
+      content,
+      hasChanges: false,
+      fileType
     }
-    console.log('[ComputerView] handleFileClick - New tab created:', newTab);
 
     setFileTabs(prevTabs => [...prevTabs, newTab]);
     setActiveFileId(newTab.id)
     setSelectedView('editing')
-    // Store initial content as original when user clicks to open a file
     setOriginalFileContents(prev => new Map(prev).set(filename, content));
   }
 
@@ -219,16 +402,10 @@ export function ComputerView({
     const newTabs = fileTabs.filter(tab => tab.id !== tabId)
     setFileTabs(newTabs)
 
-    // Select adjacent tab if closing active tab
     if (activeFileId === tabId && newTabs.length > 0) {
       const newIndex = Math.min(tabIndex, newTabs.length - 1)
       setActiveFileId(newTabs[newIndex].id)
-      setSelectedView('editing') // Ensure view remains or switches to editing
-    } else if (newTabs.length === 0) {
-      // If all tabs are closed, perhaps switch to a default view or clear activeFileId
-      // For now, let's assume it stays on 'editing' but with no file selected
-      // Or, switch to 'info' or another default view.
-      // setSelectedView('info'); // Example: switch to info if no files open
+      setSelectedView('editing')
     }
   }
 
@@ -307,17 +484,16 @@ export function ComputerView({
     if (activeTab && activeTab.hasChanges) {
       const currentContent = activeTab.content;
       setOriginalFileContents(prev => new Map(prev).set(activeTab.filename, currentContent));
-      setFileTabs(prevTabs => 
-        prevTabs.map(t => 
+      setFileTabs(prevTabs =>
+        prevTabs.map(t =>
           t.id === activeTab.id ? { ...t, hasChanges: false } : t
         )
       );
-      console.log(`File ${activeTab.filename} saved.`);
     }
-  }, [activeTab, setOriginalFileContents, setFileTabs]);
+  }, [activeTab]);
 
   const handleRevert = useCallback(() => {
-    if (activeTab) { 
+    if (activeTab) {
       const originalContent = originalFileContents.get(activeTab.filename);
       if (originalContent !== undefined) {
         setFileTabs(prevTabs =>
@@ -328,7 +504,7 @@ export function ComputerView({
         setFileContents(prev => new Map(prev).set(activeTab.filename, originalContent));
       }
     }
-  }, [activeTab, originalFileContents, setFileTabs, setFileContents]);
+  }, [activeTab, originalFileContents]);
 
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
     if (selectedView === 'editing' && activeTab) {
@@ -343,9 +519,8 @@ export function ComputerView({
         }
       }
     }
-  }, [selectedView, activeTab, originalFileContents, handleSave, handleRevert]); // Comment moved or removed
+  }, [selectedView, activeTab, originalFileContents, handleSave, handleRevert]);
 
-  // Keyboard Shortcuts
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
     return () => {
@@ -353,98 +528,9 @@ export function ComputerView({
     };
   }, [handleKeyDown]);
 
-  const renderEditorContent = () => {
-    if (selectedView === 'editing' && activeTab && activeTab.filename.endsWith('.md') && showMarkdownPreview) {
-      return (
-        <div className="flex h-full">
-          <div className="w-1/2 h-full border-r border-slate-300">
-            <textarea
-              value={activeTab.content}
-              onChange={(e) => handleFileContentChange(activeTab.id, e.target.value)}
-              className="w-full h-full outline-none resize-none text-sm font-mono text-slate-800 placeholder:text-slate-500 p-4 bg-white"
-              placeholder="Enter Markdown..."
-              readOnly={isViewingHistory || (!isLive && taskStatus !== 'completed')}
-              style={{ lineHeight: '1.6' }}
-            />
-          </div>
-          <div 
-            className="w-1/2 h-full p-4 overflow-y-auto prose prose-sm lg:prose-base bg-white"
-            dangerouslySetInnerHTML={{ __html: marked.parse(activeTab.content || '') }} 
-          />
-        </div>
-      );
-    }
-
-    if (selectedView === 'editing' && activeTab && (!activeTab.filename.endsWith('.md') || !showMarkdownPreview)) {
-      const isCodeFile = activeTab.filename.match(/\.(py|js|ts|css|json)$/);
-      let highlightedContent = '';
-      let language = '';
-
-      if (isCodeFile) {
-        const extension = activeTab.filename.split('.').pop() || '';
-        if (extension === 'py') language = 'python';
-        else if (extension === 'js') language = 'javascript';
-        else if (extension === 'ts') language = 'typescript';
-        else if (extension === 'css') language = 'css';
-        else if (extension === 'json') language = 'json';
-
-        if (language && Prism.languages[language]) {
-          highlightedContent = Prism.highlight(activeTab.content || '', Prism.languages[language], language);
-        } else {
-          highlightedContent = activeTab.content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        }
-      }
-
-      return (
-        <div className="h-full flex flex-col relative"> {/* This container might not need to be flex flex-col if its child is the scroller */}
-          {isCodeFile ? (
-            // Container A: This will be the scrollable container
-            <div 
-              ref={scrollContainerRef}
-              className="flex-1 p-0 overflow-y-auto relative bg-white" // Changed bg-slate-800 to bg-white
-              onScroll={() => {
-                if (textareaRef.current && scrollContainerRef.current) {
-                  textareaRef.current.scrollTop = scrollContainerRef.current.scrollTop;
-                }
-              }}
-            >
-              <textarea
-                ref={textareaRef}
-                value={activeTab.content}
-                onChange={(e) => handleFileContentChange(activeTab.id, e.target.value)}
-                className="w-full h-full outline-none resize-none text-sm font-mono text-transparent bg-transparent caret-slate-700 p-4 absolute inset-0 z-10 overflow-hidden" // Changed caret-white to caret-slate-700
-                placeholder="Enter code..."
-                readOnly={isViewingHistory || (!isLive && taskStatus !== 'completed')}
-                style={{ lineHeight: '1.6' }}
-                spellCheck="false"
-              />
-              <pre 
-                ref={preRef}
-                className="w-full outline-none resize-none text-sm font-mono p-4 z-0 bg-transparent" // Added bg-transparent
-                style={{ lineHeight: '1.6', margin: 0 }} 
-                aria-hidden="true"
-              >
-                <code dangerouslySetInnerHTML={{ __html: highlightedContent }} />
-              </pre>
-            </div>
-          ) : (
-            // Plain text editor
-            <div className="flex-1 p-4 overflow-hidden"> 
-              <textarea
-                value={activeTab.content}
-                onChange={(e) => handleFileContentChange(activeTab.id, e.target.value)}
-                className="w-full h-full outline-none resize-none text-sm font-mono text-slate-800 placeholder:text-slate-500 bg-white"
-                placeholder="Empty file"
-                readOnly={isViewingHistory || (!isLive && taskStatus !== 'completed')}
-                style={{ lineHeight: '1.6' }}
-              />
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    if (selectedView === 'editing' && !activeTab) {
+  // 渲染不同类型文件的内容
+  const renderFileContent = () => {
+    if (!activeTab) {
       return (
         <div className="h-full flex items-center justify-center text-slate-500">
           <div className="text-center">
@@ -455,20 +541,121 @@ export function ComputerView({
         </div>
       );
     }
-    return null; // Default case for renderEditorContent
-  }; // Explicitly terminate the const assignment
+
+    // 根据文件类型渲染不同的查看器
+    switch (activeTab.fileType) {
+      case 'image':
+        return <ImageViewer src={activeTab.content} filename={activeTab.filename} />;
+
+      case 'video':
+        return <VideoPlayer src={activeTab.content} filename={activeTab.filename} />;
+
+      case 'pdf':
+        return <PDFViewer src={activeTab.content} filename={activeTab.filename} />;
+
+      case 'markdown':
+        if (showMarkdownPreview) {
+          return (
+            <div className="flex h-full">
+              <div className="w-1/2 h-full border-r border-slate-300">
+                <textarea
+                  value={activeTab.content}
+                  onChange={(e) => handleFileContentChange(activeTab.id, e.target.value)}
+                  className="w-full h-full outline-none resize-none text-sm font-mono text-slate-800 placeholder:text-slate-500 p-4 bg-white custom-scrollbar"
+                  placeholder="Enter Markdown..."
+                  readOnly={isViewingHistory || (!isLive && taskStatus !== 'completed')}
+                  style={{ lineHeight: '1.6' }}
+                />
+              </div>
+              <div
+                className="w-1/2 h-full p-4 overflow-y-auto prose prose-sm lg:prose-base bg-white custom-scrollbar"
+                dangerouslySetInnerHTML={{ __html: marked.parse(activeTab.content || '') }}
+              />
+            </div>
+          );
+        }
+        // Fall through to text editor for markdown without preview
+
+      default:
+        // 文本文件编辑器
+        const isCodeFile = activeTab.filename.match(/\.(py|js|ts|css|json)$/);
+        let highlightedContent = '';
+        let language = '';
+
+        if (isCodeFile) {
+          const extension = activeTab.filename.split('.').pop() || '';
+          if (extension === 'py') language = 'python';
+          else if (extension === 'js') language = 'javascript';
+          else if (extension === 'ts') language = 'typescript';
+          else if (extension === 'css') language = 'css';
+          else if (extension === 'json') language = 'json';
+
+          if (language && Prism.languages[language]) {
+            highlightedContent = Prism.highlight(activeTab.content || '', Prism.languages[language], language);
+          } else {
+            highlightedContent = activeTab.content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          }
+        }
+
+        return (
+          <div className="h-full flex flex-col relative">
+            {isCodeFile ? (
+              <div
+                ref={scrollContainerRef}
+                className="flex-1 p-0 overflow-y-auto relative bg-white custom-scrollbar"
+                onScroll={() => {
+                  if (textareaRef.current && scrollContainerRef.current) {
+                    textareaRef.current.scrollTop = scrollContainerRef.current.scrollTop;
+                  }
+                }}
+              >
+                <textarea
+                  ref={textareaRef}
+                  value={activeTab.content}
+                  onChange={(e) => handleFileContentChange(activeTab.id, e.target.value)}
+                  className="w-full h-full outline-none resize-none text-sm font-mono text-transparent bg-transparent caret-slate-700 p-4 absolute inset-0 z-10 overflow-hidden"
+                  placeholder="Enter code..."
+                  readOnly={isViewingHistory || (!isLive && taskStatus !== 'completed')}
+                  style={{ lineHeight: '1.6' }}
+                  spellCheck="false"
+                />
+                <pre
+                  ref={preRef}
+                  className="w-full outline-none resize-none text-sm font-mono p-4 z-0 bg-transparent"
+                  style={{ lineHeight: '1.6', margin: 0 }}
+                  aria-hidden="true"
+                >
+                  <code dangerouslySetInnerHTML={{ __html: highlightedContent }} />
+                </pre>
+              </div>
+            ) : (
+              <div className="flex-1 p-4 overflow-hidden">
+                <textarea
+                  value={activeTab.content}
+                  onChange={(e) => handleFileContentChange(activeTab.id, e.target.value)}
+                  className="w-full h-full outline-none resize-none text-sm font-mono text-slate-800 placeholder:text-slate-500 bg-white custom-scrollbar"
+                  placeholder="Empty file"
+                  readOnly={isViewingHistory || (!isLive && taskStatus !== 'completed')}
+                  style={{ lineHeight: '1.6' }}
+                />
+              </div>
+            )}
+          </div>
+        );
+    }
+  };
 
   return (
-    <div className="h-full flex">
-      {/* Left sidebar - File structure */}
-      <div className="w-64 border-r border-slate-300 bg-slate-50">
+    <div className="h-full flex w-full">
+      {/* 左侧文件树 - 固定宽度 */}
+      <div className="w-64 border-r border-slate-300 bg-slate-50 flex-shrink-0">
         <div className="border-b border-slate-300 px-4 py-3">
           <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
             <FolderTree className="h-4 w-4" />
             File Explorer
           </h3>
         </div>
-        <div className="overflow-y-auto h-[calc(100%-3rem)] py-2">
+        <div className="overflow-y-auto h-[calc(100%-3rem)] py-2 custom-scrollbar">
           {fileStructure ? (
             renderFileTree(fileStructure)
           ) : (
@@ -479,123 +666,162 @@ export function ComputerView({
         </div>
       </div>
 
-      {/* Right content area */}
-      <div className="flex-1 flex flex-col overflow-hidden"> {/* Added overflow-hidden here for safety */}
-        {/* Unified Top Bar */}
-        <div className="flex items-center border-b border-slate-300 bg-slate-50 h-10 pr-2">
-          {/* Scrollable File Tabs */}
-          <div className="flex-shrink-0 flex overflow-x-auto h-full">
-            {fileTabs.map(tab => (
-              <div
-                key={tab.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => {
-                  setActiveFileId(tab.id)
-                  setSelectedView('editing')
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    setActiveFileId(tab.id);
-                    setSelectedView('editing');
-                  }
-                }}
-                className={`flex items-center gap-2 px-3 h-full text-sm cursor-pointer min-w-[120px] border-r border-slate-300
-                  ${activeFileId === tab.id && selectedView === 'editing' 
-                    ? 'bg-white text-slate-900' // Active file tab style
-                    : 'text-slate-600 hover:bg-slate-200 hover:text-slate-800' // Inactive file tab style
-                  }`}
+      {/* 右侧内容区域 - 严格固定宽度 */}
+      <div className="w-[calc(100vw-16rem)] flex flex-col overflow-hidden">
+        {/* 文件标签栏和工具栏 */}
+        <div className="flex items-center border-b border-slate-300 bg-slate-50 h-10">
+          {/* 文件标签滚动区域 - 固定宽度 */}
+          <div className="w-[60%] flex items-center overflow-hidden">
+            {fileTabs.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-full px-2 rounded-none border-r border-slate-300 flex-shrink-0"
+                onClick={() => scrollTabs('left')}
               >
-                <FileText className="h-3.5 w-3.5 flex-shrink-0" />
-                <span className="truncate">{tab.filename}</span>
-                {tab.hasChanges && <span className="w-2 h-2 bg-orange-400 rounded-full flex-shrink-0" />}
-                <button
-                  onClick={(e) => handleCloseTab(tab.id, e)}
-                  className="ml-auto p-0.5 hover:bg-slate-300 rounded flex-shrink-0"
-                  aria-label={`Close tab ${tab.filename}`}
+                <ChevronLeft className="h-3 w-3" />
+              </Button>
+            )}
+
+            <div
+              ref={tabsContainerRef}
+              className="flex overflow-x-hidden flex-1 h-full"
+              style={{ scrollBehavior: 'smooth' }}
+            >
+              {fileTabs.map(tab => (
+                <div
+                  key={tab.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    setActiveFileId(tab.id)
+                    setSelectedView('editing')
+                  }}
+                  className={`flex items-center gap-2 px-3 h-full text-sm cursor-pointer w-32 border-r border-slate-300 flex-shrink-0
+                    ${activeFileId === tab.id && selectedView === 'editing' 
+                      ? 'bg-white text-slate-900' 
+                      : 'text-slate-600 hover:bg-slate-200 hover:text-slate-800'
+                    }`}
                 >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            ))}
+                  <FileText className="h-3.5 w-3.5 flex-shrink-0" />
+                  <span className="truncate flex-1">{tab.filename}</span>
+                  {tab.hasChanges && <span className="w-2 h-2 bg-orange-400 rounded-full flex-shrink-0" />}
+                  <button
+                    onClick={(e) => handleCloseTab(tab.id, e)}
+                    className="p-0.5 hover:bg-slate-300 rounded flex-shrink-0"
+                    aria-label={`Close tab ${tab.filename}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {fileTabs.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-full px-2 rounded-none border-l border-slate-300 flex-shrink-0"
+                onClick={() => scrollTabs('right')}
+              >
+                <ChevronRight className="h-3 w-3" />
+              </Button>
+            )}
           </div>
 
-          {/* Terminal and Info View Selectors */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className={`h-full px-3 rounded-none text-sm flex items-center gap-1 ml-1
-              ${selectedView === 'terminal' ? 'bg-slate-200 text-slate-900' : 'text-slate-600 hover:bg-slate-200 hover:text-slate-800'}`}
-            onClick={() => setSelectedView('terminal')}
-          >
-            <Terminal className="h-4 w-4" />
-            Terminal
-            {terminalOutput.length > 0 && (
-              <span className="ml-1 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">
-                {Math.floor(terminalOutput.length / 2)}
-              </span>
-            )}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={`h-full px-3 rounded-none text-sm flex items-center gap-1
-              ${selectedView === 'info' ? 'bg-slate-200 text-slate-900' : 'text-slate-600 hover:bg-slate-200 hover:text-slate-800'}`}
-            onClick={() => setSelectedView('info')}
-          >
-            <Info className="h-4 w-4" />
-            Info
-          </Button>
-          {/* "Chat" Button Removed */}
-
-          {/* Spacer */}
-          <div className="flex-grow"></div>
-
-          {/* Save and Revert Buttons */}
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="ml-2 border-slate-300 hover:bg-slate-200 text-slate-700 flex items-center gap-1" 
-            onClick={handleSave}
-            disabled={!(activeTab && activeTab.hasChanges)}
-          >
-            <Save className="h-3.5 w-3.5" />
-            Save
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="ml-2 border-slate-300 hover:bg-slate-200 text-slate-700 flex items-center gap-1" 
-            onClick={handleRevert}
-            disabled={isViewingHistory || !(activeTab && activeTab.hasChanges)}
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            Revert
-          </Button>
-
-          {activeTab && activeTab.filename.endsWith('.md') && (
+          {/* 视图选择按钮 - 固定宽度 */}
+          <div className="w-[25%] flex border-l border-slate-300">
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
-              className="ml-2 border-slate-300 hover:bg-slate-200 text-slate-700 flex items-center gap-1"
-              onClick={() => setShowMarkdownPreview(!showMarkdownPreview)}
+              className={`flex-1 h-full px-2 rounded-none text-xs flex items-center justify-center gap-1
+                ${selectedView === 'terminal' ? 'bg-slate-200 text-slate-900' : 'text-slate-600 hover:bg-slate-200 hover:text-slate-800'}`}
+              onClick={() => setSelectedView('terminal')}
             >
-              {showMarkdownPreview ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-              {showMarkdownPreview ? 'Hide Preview' : 'Show Preview'}
+              <Terminal className="h-3 w-3" />
+              <span className="hidden sm:inline">Terminal</span>
+              {terminalOutput.length > 0 && (
+                <span className="text-xs bg-blue-100 text-blue-700 px-1 py-0.5 rounded-full">
+                  {Math.floor(terminalOutput.length / 2)}
+                </span>
+              )}
             </Button>
-          )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`flex-1 h-full px-2 rounded-none text-xs flex items-center justify-center gap-1 border-l border-slate-300
+                ${selectedView === 'info' ? 'bg-slate-200 text-slate-900' : 'text-slate-600 hover:bg-slate-200 hover:text-slate-800'}`}
+              onClick={() => setSelectedView('info')}
+            >
+              <Info className="h-3 w-3" />
+              <span className="hidden sm:inline">Info</span>
+            </Button>
+          </div>
+
+          {/* 工具按钮 - 固定宽度，使用下拉菜单 */}
+          <div className="w-[15%] flex items-center border-l border-slate-300 justify-center">
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-slate-300 hover:bg-slate-200 text-slate-700 flex items-center gap-1 text-xs px-2"
+                onClick={() => setShowToolsMenu(!showToolsMenu)}
+              >
+                Tools
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+
+              {showToolsMenu && (
+                <div className="absolute top-full right-0 mt-1 bg-white border border-slate-300 rounded-md shadow-lg z-50 min-w-[180px]">
+                  <button
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={() => {
+                      handleSave();
+                      setShowToolsMenu(false);
+                    }}
+                    disabled={!(activeTab && activeTab.hasChanges)}
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                    Save
+                  </button>
+                  <button
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={() => {
+                      handleRevert();
+                      setShowToolsMenu(false);
+                    }}
+                    disabled={isViewingHistory || !(activeTab && activeTab.hasChanges)}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Revert
+                  </button>
+                  {activeTab && activeTab.fileType === 'markdown' && (
+                    <button
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2"
+                      onClick={() => {
+                        setShowMarkdownPreview(!showMarkdownPreview);
+                        setShowToolsMenu(false);
+                      }}
+                    >
+                      {showMarkdownPreview ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      {showMarkdownPreview ? 'Hide Preview' : 'Show Preview'}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Content Area */}
-        <div className="flex-1 overflow-y-auto">
-          {selectedView === 'editing' && renderEditorContent()}
+        {/* 内容区域 */}
+        <div className="flex-1 overflow-hidden">
+          {selectedView === 'editing' && renderFileContent()}
 
           {selectedView === 'terminal' && (
             <div className="h-full flex flex-col bg-slate-900">
-              <div 
+              <div
                 ref={terminalDisplayRef}
-                className="flex-1 overflow-y-auto p-4 font-mono text-sm"
+                className="flex-1 overflow-y-auto p-4 font-mono text-sm custom-scrollbar-dark"
               >
                 {displayedTerminalOutput.length > 0 ? (
                   displayedTerminalOutput.map((line, i) => (
@@ -603,7 +829,7 @@ export function ComputerView({
                       key={i}
                       className={`mb-1 ${
                         line.startsWith('$') ? 'text-green-400 font-bold' : 
-                        line.startsWith('>') ? 'text-sky-400' : 'text-slate-300' // User commands in sky blue
+                        line.startsWith('>') ? 'text-sky-400' : 'text-slate-300'
                       }`}
                       style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}
                     >
@@ -633,7 +859,7 @@ export function ComputerView({
           )}
 
           {selectedView === 'info' && (
-            <div className="p-4 overflow-y-auto">
+            <div className="p-4 overflow-y-auto custom-scrollbar">
               <div className="space-y-6 max-w-2xl">
                 <div>
                   <h3 className="font-semibold text-slate-900 mb-3">Task Status</h3>
@@ -669,38 +895,44 @@ export function ComputerView({
                   </div>
                 </div>
 
-                {activeTab && selectedView === 'editing' && ( 
+                {activeTab && (
                   <div>
-                    <h3 className="font-semibold text-slate-900 mb-3">Current File {activeTab.hasChanges ? <span className="text-orange-500 font-normal">(Unsaved)</span> : ''}</h3>
+                    <h3 className="font-semibold text-slate-900 mb-3">
+                      Current File {activeTab.hasChanges ? <span className="text-orange-500 font-normal">(Unsaved)</span> : ''}
+                    </h3>
                     <div className="bg-slate-100 rounded-lg p-4 space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-slate-600">Name:</span>
                         <span className="font-mono">{activeTab.filename}</span>
                       </div>
                       <div className="flex justify-between">
+                        <span className="text-slate-600">Type:</span>
+                        <span className="capitalize">{activeTab.fileType}</span>
+                      </div>
+                      <div className="flex justify-between">
                         <span className="text-slate-600">Size:</span>
                         <span>{formatFileSize(new Blob([activeTab.content]).size)}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">Lines:</span>
-                        <span>{activeTab.content.split('\n').length}</span>
-                      </div>
+                      {activeTab.fileType === 'text' || activeTab.fileType === 'markdown' ? (
+                        <div className="flex justify-between">
+                          <span className="text-slate-600">Lines:</span>
+                          <span>{activeTab.content.split('\n').length}</span>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 )}
               </div>
             </div>
           )}
-
-          {/* Chat View Rendering Removed */}
         </div>
-        
-        {/* Dashboard Operations Area (remains at the bottom of the right panel) */}
+
+        {/* 历史记录控制区域 */}
         <div className="border-t border-slate-300 p-4 bg-slate-50">
           <div className="flex items-center gap-4">
-            <Button 
-              variant="outline" 
-              size="icon" 
+            <Button
+              variant="outline"
+              size="icon"
               className="border-slate-300 hover:bg-slate-200"
               onClick={() => onHistoryChange?.(Math.max(0, (currentHistoryIndexValue ?? 0) - 1))}
               disabled={historyLength === 0 || currentHistoryIndexValue === 0}
@@ -715,9 +947,9 @@ export function ComputerView({
               onValueChange={value => onHistoryChange?.(value[0])}
               disabled={historyLength === 0}
             />
-            <Button 
-              variant="outline" 
-              size="icon" 
+            <Button
+              variant="outline"
+              size="icon"
               className="border-slate-300 hover:bg-slate-200"
               onClick={() => onHistoryChange?.(Math.min(historyLength - 1, (currentHistoryIndexValue ?? -1) + 1))}
               disabled={historyLength === 0 || !isViewingHistory || currentHistoryIndexValue === historyLength - 1}
@@ -729,7 +961,7 @@ export function ComputerView({
                 variant="outline"
                 size="sm"
                 className="ml-2 border-blue-500 text-blue-600 hover:bg-blue-50"
-                onClick={() => onHistoryChange?.(-1)} 
+                onClick={() => onHistoryChange?.(-1)}
               >
                 Go Live
               </Button>
@@ -737,6 +969,8 @@ export function ComputerView({
           </div>
         </div>
       </div>
+
+
     </div>
   )
 }
