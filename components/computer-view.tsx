@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useCallback } from "react" // Removed useMemo
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent } from "@/components/ui/tabs" // TabsList and TabsTrigger will be removed
 import { Slider } from "@/components/ui/slider"
@@ -66,11 +66,10 @@ export function ComputerView({
       setSelectedView('editing') // Ensure view is set to editing
       setFileContents(prev => new Map(prev).set(currentFile, fileContent)) // Keep this for now, might simplify later
       // If it's a new tab being auto-opened, store its initial content as original
-      if (!fileTabs.find(tab => tab.filename === currentFile)) {
-        setOriginalFileContents(prev => new Map(prev).set(currentFile, fileContent));
-      }
+      // The outer if already ensures !fileTabs.find(tab => tab.filename === currentFile)
+      setOriginalFileContents(prev => new Map(prev).set(currentFile, fileContent));
     }
-  }, [currentFile, fileContent, fileTabs]) // Removed originalFileContents from here
+  }, [currentFile, fileContent, fileTabs])
 
   // Update file content when it changes from server
   useEffect(() => {
@@ -211,9 +210,9 @@ export function ComputerView({
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
-  const activeTab = fileTabs.find(tab => tab.id === activeFileId)
+  const activeTab = fileTabs.find(tab => tab.id === activeFileId);
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     if (activeTab && activeTab.hasChanges) {
       const currentContent = activeTab.content;
       setOriginalFileContents(prev => new Map(prev).set(activeTab.filename, currentContent));
@@ -222,54 +221,139 @@ export function ComputerView({
           t.id === activeTab.id ? { ...t, hasChanges: false } : t
         )
       );
-      // Propagate the change to the parent/server if necessary
-      // This might involve calling setFileContent if the parent needs to know the "saved" content
-      // For now, we assume setFileContent is for the server to push content, not for us to push saves.
-      // If there was an API call: apiService.saveFile(activeTab.filename, currentContent);
       console.log(`File ${activeTab.filename} saved.`);
     }
-  };
+  }, [activeTab, setOriginalFileContents, setFileTabs]);
 
-  const handleRevert = () => {
-    if (activeTab) { // Revert should be possible if original content exists, even if hasChanges is false (to revert an accidental save)
+  const handleRevert = useCallback(() => {
+    if (activeTab) { 
       const originalContent = originalFileContents.get(activeTab.filename);
       if (originalContent !== undefined) {
-        // Update the active file tab's displayed content and reset changes
         setFileTabs(prevTabs =>
           prevTabs.map(t =>
             t.id === activeTab.id ? { ...t, content: originalContent, hasChanges: false } : t
           )
         );
-        // Also update the live content cache if it's being used independently
         setFileContents(prev => new Map(prev).set(activeTab.filename, originalContent));
       }
     }
-  };
+  }, [activeTab, originalFileContents, setFileTabs, setFileContents]);
+
+  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    if (selectedView === 'editing' && activeTab) {
+      if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+        event.preventDefault();
+        if (activeTab.hasChanges) handleSave();
+      } else if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
+        event.preventDefault();
+        const originalContent = originalFileContents.get(activeTab.filename);
+        if (activeTab.hasChanges || (originalContent !== undefined && activeTab.content !== originalContent)) {
+          handleRevert();
+        }
+      }
+    }
+  }, [selectedView, activeTab, originalFileContents, handleSave, handleRevert]); // Comment moved or removed
 
   // Keyboard Shortcuts
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (selectedView === 'editing' && activeTab) {
-        if ((event.ctrlKey || event.metaKey) && event.key === 's') {
-          event.preventDefault();
-          if (activeTab.hasChanges) handleSave();
-        } else if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
-          event.preventDefault();
-          // Revert should be possible if original content exists and differs, or if hasChanges is true
-          const originalContent = originalFileContents.get(activeTab.filename);
-          if (activeTab.hasChanges || (originalContent !== undefined && activeTab.content !== originalContent)) {
-            handleRevert();
-          }
-        }
-      }
-    };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps 
-  }, [selectedView, activeTab, originalFileContents]); // Dependencies updated, handleSave/Revert are stable
+  }, [handleKeyDown]);
+
+  const renderEditorContent = () => {
+    if (selectedView === 'editing' && activeTab && activeTab.filename.endsWith('.md') && showMarkdownPreview) {
+      return (
+        <div className="flex h-full">
+          <div className="w-1/2 h-full border-r border-slate-300">
+            <textarea
+              value={activeTab.content}
+              onChange={(e) => handleFileContentChange(activeTab.id, e.target.value)}
+              className="w-full h-full outline-none resize-none text-sm font-mono text-slate-800 placeholder:text-slate-400 p-4 bg-white"
+              placeholder="Enter Markdown..."
+              readOnly={!isLive && taskStatus !== 'completed'}
+              style={{ lineHeight: '1.6' }}
+            />
+          </div>
+          <div 
+            className="w-1/2 h-full p-4 overflow-y-auto prose prose-sm lg:prose-base bg-white"
+            dangerouslySetInnerHTML={{ __html: marked.parse(activeTab.content || '') }} 
+          />
+        </div>
+      );
+    }
+
+    if (selectedView === 'editing' && activeTab && (!activeTab.filename.endsWith('.md') || !showMarkdownPreview)) {
+      const isCodeFile = activeTab.filename.match(/\.(py|js|ts|css|json)$/);
+      let highlightedContent = '';
+      let language = '';
+
+      if (isCodeFile) {
+        const extension = activeTab.filename.split('.').pop() || '';
+        if (extension === 'py') language = 'python';
+        else if (extension === 'js') language = 'javascript';
+        else if (extension === 'ts') language = 'typescript';
+        else if (extension === 'css') language = 'css';
+        else if (extension === 'json') language = 'json';
+
+        if (language && Prism.languages[language]) {
+          highlightedContent = Prism.highlight(activeTab.content || '', Prism.languages[language], language);
+        } else {
+          highlightedContent = activeTab.content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+      }
+
+      return (
+        <div className="h-full flex flex-col relative">
+          {isCodeFile ? (
+            <div className="flex-1 p-0 overflow-hidden relative">
+              <textarea
+                value={activeTab.content}
+                onChange={(e) => handleFileContentChange(activeTab.id, e.target.value)}
+                className="w-full h-full outline-none resize-none text-sm font-mono text-transparent bg-transparent caret-slate-800 p-4 absolute inset-0 z-10"
+                placeholder="Enter code..."
+                readOnly={!isLive && taskStatus !== 'completed'}
+                style={{ lineHeight: '1.6' }}
+                spellCheck="false"
+              />
+              <pre 
+                className="w-full h-full outline-none resize-none text-sm font-mono p-4 absolute inset-0 z-0 overflow-auto"
+                style={{ lineHeight: '1.6', margin: 0 }}
+                aria-hidden="true"
+              >
+                <code dangerouslySetInnerHTML={{ __html: highlightedContent }} />
+              </pre>
+            </div>
+          ) : (
+            <div className="flex-1 p-4 overflow-hidden">
+              <textarea
+                value={activeTab.content}
+                onChange={(e) => handleFileContentChange(activeTab.id, e.target.value)}
+                className="w-full h-full outline-none resize-none text-sm font-mono text-slate-800 placeholder:text-slate-400 bg-white"
+                placeholder="Empty file"
+                readOnly={!isLive && taskStatus !== 'completed'}
+                style={{ lineHeight: '1.6' }}
+              />
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (selectedView === 'editing' && !activeTab) {
+      return (
+        <div className="h-full flex items-center justify-center text-slate-500">
+          <div className="text-center">
+            <FileText className="h-12 w-12 mx-auto mb-2 text-slate-300" />
+            <p className="text-sm">No files open</p>
+            <p className="text-xs mt-1">Select a file from the explorer or open a new one.</p>
+          </div>
+        </div>
+      );
+    }
+    return null; // Default case for renderEditorContent
+  }; // Explicitly terminate the const assignment
 
   return (
     <div className="h-full flex">
@@ -391,96 +475,7 @@ export function ComputerView({
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto">
-          {selectedView === 'editing' && activeTab && activeTab.filename.endsWith('.md') && showMarkdownPreview && (
-            <div className="flex h-full">
-              <div className="w-1/2 h-full border-r border-slate-300">
-                <textarea
-                  value={activeTab.content}
-                  onChange={(e) => handleFileContentChange(activeTab.id, e.target.value)}
-                  className="w-full h-full outline-none resize-none text-sm font-mono text-slate-800 placeholder:text-slate-400 p-4 bg-white"
-                  placeholder="Enter Markdown..."
-                  readOnly={!isLive && taskStatus !== 'completed'}
-                  style={{ lineHeight: '1.6' }}
-                />
-              </div>
-              <div 
-                className="w-1/2 h-full p-4 overflow-y-auto prose prose-sm lg:prose-base bg-white"
-                dangerouslySetInnerHTML={{ __html: marked.parse(activeTab.content || '') }} 
-              />
-            </div>
-          )}
-
-          {selectedView === 'editing' && activeTab && (!activeTab.filename.endsWith('.md') || !showMarkdownPreview) && (
-            (() => {
-              const isCodeFile = activeTab.filename.match(/\.(py|js|ts|css|json)$/);
-              let highlightedContent = '';
-              let language = '';
-
-              if (isCodeFile) {
-                const extension = activeTab.filename.split('.').pop() || '';
-                if (extension === 'py') language = 'python';
-                else if (extension === 'js') language = 'javascript';
-                else if (extension === 'ts') language = 'typescript';
-                else if (extension === 'css') language = 'css';
-                else if (extension === 'json') language = 'json';
-
-                if (language && Prism.languages[language]) {
-                  highlightedContent = Prism.highlight(activeTab.content || '', Prism.languages[language], language);
-                } else {
-                  // Fallback for unknown languages or if Prism component not loaded
-                  highlightedContent = activeTab.content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-                }
-              }
-
-              return (
-                <div className="h-full flex flex-col relative"> {/* Ensure parent is flex for editor to fill */}
-                  {isCodeFile ? (
-                    <div className="flex-1 p-0 overflow-hidden relative">
-                      <textarea
-                        value={activeTab.content}
-                        onChange={(e) => handleFileContentChange(activeTab.id, e.target.value)}
-                        className="w-full h-full outline-none resize-none text-sm font-mono text-transparent bg-transparent caret-slate-800 p-4 absolute inset-0 z-10"
-                        placeholder="Enter code..."
-                        readOnly={!isLive && taskStatus !== 'completed'}
-                        style={{ lineHeight: '1.6' }}
-                        spellCheck="false"
-                      />
-                      <pre 
-                        className="w-full h-full outline-none resize-none text-sm font-mono p-4 absolute inset-0 z-0 overflow-auto"
-                        style={{ lineHeight: '1.6', margin: 0 }} // Ensure pre has no margin
-                        aria-hidden="true"
-                      >
-                        <code dangerouslySetInnerHTML={{ __html: highlightedContent }} />
-                      </pre>
-                    </div>
-                  ) : (
-                     // Plain text editor (non-MD, non-code, or MD with preview hidden)
-                    <div className="flex-1 p-4 overflow-hidden">
-                      <textarea
-                        value={activeTab.content}
-                        onChange={(e) => handleFileContentChange(activeTab.id, e.target.value)}
-                        className="w-full h-full outline-none resize-none text-sm font-mono text-slate-800 placeholder:text-slate-400 bg-white"
-                        placeholder="Empty file"
-                        readOnly={!isLive && taskStatus !== 'completed'}
-                        style={{ lineHeight: '1.6' }}
-                      />
-                    </div>
-                  )}
-                </div>
-              );
-            })()
-          )}
-          
-          {selectedView === 'editing' && !activeTab && (
-            <div className="h-full flex items-center justify-center text-slate-500">
-              <div className="text-center">
-                <FileText className="h-12 w-12 mx-auto mb-2 text-slate-300" />
-                  <p className="text-sm">No files open</p>
-                  <p className="text-xs mt-1">Select a file from the explorer or open a new one.</p>
-                </div>
-              </div>
-            )
-          )}
+          {selectedView === 'editing' && renderEditorContent()}
 
           {selectedView === 'terminal' && (
             <div className="h-full overflow-y-auto p-4 font-mono text-sm bg-slate-900">
