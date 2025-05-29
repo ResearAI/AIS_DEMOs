@@ -73,9 +73,9 @@ export default function Home() {
       {/* 水墨画背景 - 极淡 */}
       <div className="absolute inset-0">
         <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-gray-50/95 to-gray-100/90"></div>
-        <svg className="absolute inset-0 w-full h-full opacity-[0.03]" preserveAspectRatio="xMidYMid slice">
+        <svg className="absolute inset-0 w-full h-full opacity-[0.07]" preserveAspectRatio="xMidYMid slice">
           <filter id="ink">
-            <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="3" result="turbulence"/>
+            <feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="4" result="turbulence"/>
             <feColorMatrix in="turbulence" type="saturate" values="0"/>
           </filter>
           <rect width="100%" height="100%" filter="url(#ink)"/>
@@ -87,8 +87,8 @@ export default function Home() {
           {/* 品牌标识 - 极简设计 */}
           <div className="text-center mb-12">
             <div className="inline-block relative">
-              <h1 className="text-6xl font-extralight text-gray-900 tracking-tight">
-                Resear
+              <h1 className="text-6xl font-extralight tracking-tight">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-slate-700 via-sky-600 to-slate-700">Resear</span>
                 <span className="font-normal text-gray-800 ml-2">Pro</span>
               </h1>
               <div className="absolute -top-3 -right-3 text-gray-400 opacity-50">
@@ -105,9 +105,9 @@ export default function Home() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className={`relative transition-all duration-300 ${isFocused ? 'transform -translate-y-1' : ''}`}>
               <div className={`
-                backdrop-blur-xl bg-white/70 border rounded-2xl 
+                backdrop-blur-xl bg-white/60 border rounded-2xl 
                 shadow-lg hover:shadow-xl transition-all duration-300
-                ${isFocused ? 'border-gray-400 shadow-gray-200/50' : 'border-gray-200/50'}
+                ${isFocused ? 'border-gray-300 shadow-gray-200/50' : 'border-gray-200/50'}
               `}>
                 <textarea
                   className="w-full px-6 py-5 text-base resize-none border-0 bg-transparent focus:outline-none placeholder:text-gray-400 min-h-[120px]"
@@ -151,7 +151,7 @@ export default function Home() {
 
                   <Button
                     type="submit"
-                    className="bg-gray-900 hover:bg-gray-800 text-white px-6 rounded-xl shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200"
+                    className="bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 hover:opacity-90 text-white px-6 rounded-xl shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200"
                     disabled={isSubmitting || !prompt.trim()}
                   >
                     {isSubmitting ? (
