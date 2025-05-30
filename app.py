@@ -233,7 +233,12 @@ class TaskExecutor:
         self.is_paused = False
         self.all_files = {}  # 存储所有创建的文件
         self.execution_log = []  # 执行日志
-        self.file_structure = {}  # 文件结构
+        self.file_structure = {
+            "name": "resear-pro-task",
+            "type": "directory", 
+            "children": []
+        }  # 文件结构
+        self.task_status = "created"  # 添加任务状态追踪
 
     def emit_activity(self, activity_type: str, text: str, **kwargs) -> int:
         """
@@ -397,6 +402,9 @@ class TaskExecutor:
             status: 任务状态 (started, completed, failed, paused)
             **kwargs: 其他状态信息
         """
+        # 更新内部状态
+        self.task_status = status
+        
         if self.task_id in task_queues:
             task_queues[self.task_id].put({
                 "type": "task_update",
@@ -423,6 +431,10 @@ class TaskExecutor:
         Args:
             filename: 被删除的文件名
         """
+        # 从文件存储中删除
+        if filename in self.all_files:
+            del self.all_files[filename]
+        
         # 更新文件结构
         self.update_file_structure()
         
@@ -442,6 +454,12 @@ class TaskExecutor:
             old_name: 原文件名
             new_name: 新文件名
         """
+        # 重命名文件存储
+        if old_name in self.all_files:
+            content = self.all_files[old_name]
+            del self.all_files[old_name]
+            self.all_files[new_name] = content
+        
         # 更新文件结构
         self.update_file_structure()
         
@@ -452,6 +470,64 @@ class TaskExecutor:
                     "old_name": old_name,
                     "new_name": new_name
                 }
+            })
+
+    def create_folder(self, folder_name: str, parent_path: str = ''):
+        """
+        创建文件夹
+
+        Args:
+            folder_name: 文件夹名称
+            parent_path: 父路径
+        """
+        # 计算完整路径
+        full_path = folder_name if not parent_path or parent_path == 'resear-pro-task' else f"{parent_path}/{folder_name}"
+        
+        # 更新文件结构（文件夹不需要在all_files中存储）
+        self.update_file_structure_for_folder(full_path)
+        
+        # 发送文件夹创建事件
+        if self.task_id in task_queues:
+            task_queues[self.task_id].put({
+                "type": "folder_create",
+                "data": {
+                    "folder_name": full_path,
+                    "parent_path": parent_path
+                }
+            })
+
+    def update_file_structure_for_folder(self, folder_path: str):
+        """为文件夹更新文件结构"""
+        path_parts = [part for part in folder_path.split('/') if part != 'resear-pro-task' and part != '']
+        
+        current = self.file_structure
+        if not current.get("children"):
+            current["children"] = []
+        
+        # 遍历路径创建文件夹结构
+        for i, part in enumerate(path_parts):
+            existing = None
+            for child in current["children"]:
+                if child["name"] == part and child["type"] == "directory":
+                    existing = child
+                    break
+            
+            if not existing:
+                new_folder = {
+                    "name": part,
+                    "type": "directory",
+                    "children": []
+                }
+                current["children"].append(new_folder)
+                current = new_folder
+            else:
+                current = existing
+        
+        # 发送文件结构更新
+        if self.task_id in task_queues:
+            task_queues[self.task_id].put({
+                "type": "file_structure_update",
+                "data": self.file_structure
             })
 
     def wait_if_paused(self, step_duration: float = 1.0):
@@ -1194,7 +1270,14 @@ def create_file(task_id):
             })
         else:
             # 创建文件夹的逻辑（如果需要的话）
-            return jsonify({'error': 'Folder creation not implemented yet'}), 501
+            executor.create_folder(filename)
+            return jsonify({
+                'success': True, 
+                'message': f'Folder {filename} created successfully',
+                'filename': filename,
+                'type': 'folder',
+                'file_structure': executor.file_structure
+            })
 
     except Exception as e:
         logger.error(f"Error creating file for task {task_id}: {str(e)}")
@@ -1222,12 +1305,6 @@ def delete_file(task_id):
             return jsonify({'error': f'File {filename} not found'}), 404
 
         # 删除文件
-        del executor.all_files[filename]
-        
-        # 更新文件结构
-        executor.update_file_structure()
-        
-        # 发送文件删除事件
         executor.emit_file_delete(filename)
         
         # 记录文件删除活动
@@ -1278,14 +1355,6 @@ def rename_file(task_id):
             return jsonify({'error': f'File {new_name} already exists'}), 400
 
         # 重命名文件
-        content = executor.all_files[old_name]
-        del executor.all_files[old_name]
-        executor.all_files[new_name] = content
-        
-        # 更新文件结构
-        executor.update_file_structure()
-        
-        # 发送文件重命名事件
         executor.emit_file_rename(old_name, new_name)
         
         # 记录文件重命名活动
