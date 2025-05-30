@@ -38,8 +38,17 @@ function DashboardPageContent() {
   const [isPaused, setIsPaused] = useState(false)
   const [displayedActivities, setDisplayedActivities] = useState<ApiActivity[]>([]);
 
-  // 修改面板状态为三种模式
-  const [layoutMode, setLayoutMode] = useState<'both' | 'chat-only' | 'workspace-only'>('both')
+  // 新增面板隐藏状态
+  const [isChatHidden, setIsChatHidden] = useState(false)
+  const [isWorkspaceHidden, setIsWorkspaceHidden] = useState(false)
+
+  // 添加面板状态保护，防止两个都被隐藏
+  useEffect(() => {
+    if (isChatHidden && isWorkspaceHidden) {
+      // 如果两个都被隐藏，默认显示对话框
+      setIsChatHidden(false);
+    }
+  }, [isChatHidden, isWorkspaceHidden]);
 
   // 添加文件选择状态
   const [selectedFile, setSelectedFile] = useState<{ filename: string; content: string } | null>(null)
@@ -198,43 +207,32 @@ function DashboardPageContent() {
     }
   }, []);
 
-  // 修改面板控制逻辑，实现三种状态切换
-  const handleLayoutToggle = () => {
-    setLayoutMode(prevMode => {
-      switch (prevMode) {
-        case 'both':
-          return 'workspace-only'  // 隐藏Chat，只显示Workspace
-        case 'workspace-only':
-          return 'chat-only'       // 隐藏Workspace，只显示Chat
-        case 'chat-only':
-          return 'both'            // 显示两者
-        default:
-          return 'both'
-      }
-    })
-  }
-
-  // 获取布局按钮的文本和图标
-  const getLayoutButtonContent = () => {
-    switch (layoutMode) {
-      case 'both':
-        return { text: 'Focus Workspace', icon: <PanelRightClose className="h-4 w-4" /> }
-      case 'workspace-only':
-        return { text: 'Focus Chat', icon: <PanelLeftClose className="h-4 w-4" /> }
-      case 'chat-only':
-        return { text: 'Show Both', icon: <Sparkles className="h-4 w-4" /> }
-      default:
-        return { text: 'Toggle Layout', icon: <Sparkles className="h-4 w-4" /> }
+  // 修改面板控制逻辑，只允许三种状态
+  const handleChatToggle = () => {
+    if (isChatHidden && isWorkspaceHidden) {
+      // 如果都隐藏了，显示对话框
+      setIsChatHidden(false);
+    } else if (!isChatHidden && !isWorkspaceHidden) {
+      // 如果都显示，隐藏对话框
+      setIsChatHidden(true);
+    } else if (isChatHidden && !isWorkspaceHidden) {
+      // 如果只显示操作台，显示对话框
+      setIsChatHidden(false);
     }
-  }
+  };
 
-  // 获取任务开始时间（用于计算运行时长）
-  const getTaskStartTime = () => {
-    if (displayedActivities.length > 0) {
-      return displayedActivities[0].timestamp
+  const handleWorkspaceToggle = () => {
+    if (isChatHidden && isWorkspaceHidden) {
+      // 如果都隐藏了，显示操作台
+      setIsWorkspaceHidden(false);
+    } else if (!isChatHidden && !isWorkspaceHidden) {
+      // 如果都显示，隐藏操作台
+      setIsWorkspaceHidden(true);
+    } else if (!isChatHidden && isWorkspaceHidden) {
+      // 如果只显示对话框，显示操作台
+      setIsWorkspaceHidden(false);
     }
-    return Math.floor(Date.now() / 1000)
-  }
+  };
 
   // Determine display state based on whether viewing history or live
   const displayState: HistorySnapshot = isViewingHistory && history[currentHistoryIndex]
@@ -334,38 +332,33 @@ function DashboardPageContent() {
 
   // 计算布局宽度
   const getChatWidth = () => {
-    switch (layoutMode) {
-      case 'chat-only': return 'w-1/2'
-      case 'workspace-only': return 'w-0'
-      case 'both': return 'w-[39%]'
-      default: return 'w-[39%]'
-    }
+    if (isChatHidden && isWorkspaceHidden) return 'w-0'
+    if (isChatHidden) return 'w-0'
+    if (isWorkspaceHidden) return 'w-1/2'
+    return 'w-[39%]'
   }
 
   const getChatPosition = () => {
-    return layoutMode === 'chat-only' ? 'ml-[25%]' : ''
+    if (isWorkspaceHidden && !isChatHidden) return 'ml-[25%]' // 居中
+    return ''
   }
 
   const getFileTreeWidth = () => {
-    switch (layoutMode) {
-      case 'chat-only': return 'w-0'
-      case 'workspace-only': return 'w-[14%]'
-      case 'both': return 'w-[14%]'
-      default: return 'w-[14%]'
-    }
+    if (isChatHidden && isWorkspaceHidden) return 'w-0'
+    if (isChatHidden) return 'w-[14%]'
+    if (isWorkspaceHidden) return 'w-0'
+    return 'w-[14%]'
   }
 
   const getWorkspaceWidth = () => {
-    switch (layoutMode) {
-      case 'chat-only': return 'w-0'
-      case 'workspace-only': return 'w-[86%]'
-      case 'both': return 'w-[47%]'
-      default: return 'w-[47%]'
-    }
+    if (isChatHidden && isWorkspaceHidden) return 'w-0'
+    if (isChatHidden) return 'w-[86%]'
+    if (isWorkspaceHidden) return 'w-0'
+    return 'w-[47%]'
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: layoutMode === 'chat-only' ? 'rgb(255, 255, 255)' : 'rgb(250, 252, 254)' }}>
+    <div className="min-h-screen" style={{ backgroundColor: isWorkspaceHidden && !isChatHidden ? 'rgb(255, 255, 255)' : 'rgb(250, 252, 254)' }}>
       {/* 顶部标题栏 - 移动端简化版 */}
       {isMobile ? (
         <div className="bg-white border-b border-slate-300 h-14 flex-shrink-0">
@@ -437,17 +430,29 @@ function DashboardPageContent() {
               </div>
 
               <div className="flex items-center gap-3">
-                {/* 合并的布局控制按钮 */}
+                {/* 面板控制按钮 - 移到Pause按钮左侧，修改逻辑 */}
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleLayoutToggle}
+                  onClick={handleChatToggle}
                   className="border-slate-300 hover:bg-slate-100"
-                  title={`Current: ${layoutMode.replace('-', ' ')} | Click to toggle layout`}
+                  title={isChatHidden ? "显示对话框" : "隐藏对话框"}
                 >
-                  {getLayoutButtonContent().icon}
+                  <PanelLeftClose className="h-4 w-4" />
                   <span className="ml-1 text-xs">
-                    {getLayoutButtonContent().text}
+                    {isChatHidden ? "Chat" : "Hide Chat"}
+                  </span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleWorkspaceToggle}
+                  className="border-slate-300 hover:bg-slate-100"
+                  title={isWorkspaceHidden ? "显示操作台" : "隐藏操作台"}
+                >
+                  <PanelRightClose className="h-4 w-4" />
+                  <span className="ml-1 text-xs">
+                    {isWorkspaceHidden ? "Workspace" : "Hide Workspace"}
                   </span>
                 </Button>
 
@@ -531,7 +536,7 @@ function DashboardPageContent() {
           /* 桌面端：保持原有布局 */
           <>
             {/* 当操作台隐藏时，显示简洁的对话框界面 */}
-            {layoutMode === 'chat-only' ? (
+            {isWorkspaceHidden && !isChatHidden ? (
               <div className="w-full h-full panel-transition">
                 <DashboardContent
                   activeTask={displayState.promptText}
@@ -547,8 +552,8 @@ function DashboardPageContent() {
             ) : (
               <>
                 {/* 左侧对话框 */}
-                <div className={`${getChatWidth()} ${getChatPosition()} panel-transition border-r border-slate-300 bg-white flex-shrink-0 ${layoutMode === 'workspace-only' ? 'border-r-0' : ''}`}>
-                  {layoutMode !== 'workspace-only' && (
+                <div className={`${getChatWidth()} ${getChatPosition()} panel-transition border-r border-slate-300 bg-white flex-shrink-0 ${isChatHidden ? 'border-r-0' : ''}`}>
+                  {!isChatHidden && (
                     <div className="h-full overflow-hidden">
                       <DashboardContent
                         activeTask={displayState.promptText}
@@ -565,8 +570,8 @@ function DashboardPageContent() {
                 </div>
 
                 {/* 中间文件树 - 修复显示逻辑 */}
-                <div className={`${getFileTreeWidth()} panel-transition border-r border-slate-300 bg-slate-50 flex-shrink-0 ${layoutMode === 'chat-only' ? 'border-r-0' : ''}`}>
-                  {(layoutMode === 'both' || layoutMode === 'workspace-only') && (
+                <div className={`${getFileTreeWidth()} panel-transition border-r border-slate-300 bg-slate-50 flex-shrink-0 ${(isChatHidden && !isWorkspaceHidden) ? 'border-r-0' : ''}`}>
+                  {!isWorkspaceHidden && (
                     <div className="h-full overflow-hidden">
                       <ComputerView
                         ref={computerViewRef}
@@ -585,8 +590,6 @@ function DashboardPageContent() {
                         onFileSelect={handleFileSelect}
                         onFileEditStateChange={handleFileEditStateChange}
                         taskId={taskId}
-                        activities={displayState.activities}
-                        taskStartTime={getTaskStartTime()}
                       />
                     </div>
                   )}
@@ -594,7 +597,7 @@ function DashboardPageContent() {
 
                 {/* 右侧操作台 */}
                 <div className={`${getWorkspaceWidth()} panel-transition bg-white flex-shrink-0`}>
-                  {(layoutMode === 'both' || layoutMode === 'workspace-only') && (
+                  {!isWorkspaceHidden && (
                     <div className="h-full overflow-hidden">
                       <ComputerView
                         ref={computerViewRef}
@@ -610,12 +613,10 @@ function DashboardPageContent() {
                         currentHistoryIndexValue={currentHistoryIndex}
                         onHistoryChange={handleHistoryChange}
                         showOnlyWorkspace={true}
-                        maxTabs={layoutMode === 'workspace-only' ? 8 : 4}
+                        maxTabs={isChatHidden ? 8 : 4}
                         onFileSelect={handleFileSelect}
                         onFileEditStateChange={handleFileEditStateChange}
                         taskId={taskId}
-                        activities={displayState.activities}
-                        taskStartTime={getTaskStartTime()}
                       />
                     </div>
                   )}
@@ -624,12 +625,12 @@ function DashboardPageContent() {
             )}
 
             {/* 对话框隐藏/显示按钮 */}
-            {layoutMode === 'workspace-only' && (
+            {isChatHidden && !isWorkspaceHidden && (
               <div className="absolute left-0 top-1/2 transform -translate-y-1/2 z-10 panel-transition">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleLayoutToggle}
+                  onClick={handleChatToggle}
                   className="h-20 w-6 rounded-l-none rounded-r-lg border-l-0 bg-white/90 backdrop-blur-sm hover:bg-white border-slate-300 flex flex-col items-center justify-center p-0 panel-transition hover:w-8"
                 >
                   <ChevronRight className="h-4 w-4" />
@@ -638,12 +639,12 @@ function DashboardPageContent() {
             )}
 
             {/* 操作台隐藏/显示按钮 */}
-            {layoutMode === 'chat-only' && (
+            {isWorkspaceHidden && !isChatHidden && (
               <div className="absolute right-0 top-1/2 transform -translate-y-1/2 z-10 panel-transition">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleLayoutToggle}
+                  onClick={handleWorkspaceToggle}
                   className="h-20 w-6 rounded-r-none rounded-l-lg border-r-0 bg-white/90 backdrop-blur-sm hover:bg-white border-slate-300 flex flex-col items-center justify-center p-0 panel-transition hover:w-8"
                 >
                   <ChevronLeft className="h-4 w-4" />

@@ -69,11 +69,11 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen relative overflow-hidden" style={{ backgroundColor: 'rgb(245, 244, 240)' }}>
-      {/* 水墨画背景 - 40% 透明度 */}
+    <main className="min-h-screen relative overflow-hidden" style={{ backgroundColor: 'rgb(255, 252, 252)' }}>
+      {/* 水墨画背景 - 5% 透明度 */}
       <div className="absolute inset-0">
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgb(245, 244, 240) 0%, rgba(245, 244, 240, 0.95) 50%, rgba(240, 238, 235, 0.9) 100%)' }}></div>
-        <svg className="absolute inset-0 w-full h-full opacity-40" preserveAspectRatio="xMidYMid slice">
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgb(255, 252, 252) 0%, rgba(255, 252, 252, 0.98) 50%, rgba(252, 250, 248, 0.95) 100%)' }}></div>
+        <svg className="absolute inset-0 w-full h-full opacity-5" preserveAspectRatio="xMidYMid slice">
           <defs>
             <filter id="ink">
               <feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="4" result="turbulence"/>
@@ -122,7 +122,7 @@ export default function Home() {
           <div className="text-center mb-12">
             <div className="inline-block relative">
               <h1 className="text-6xl font-extralight tracking-tight">
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-slate-700 via-sky-600 to-slate-700">Resear</span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-500 via-pink-500 via-red-500 via-orange-500 via-yellow-500 via-green-500 via-blue-500 to-purple-500 animate-gradient-x">Resear</span>
                 <span className="font-normal text-slate-800 ml-2">Pro</span>
               </h1>
               <div className="absolute -top-3 -right-3 text-slate-400 opacity-50">

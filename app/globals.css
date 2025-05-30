@@ -57,3 +57,108 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* 炫彩渐变动画 */
+@keyframes gradient-x {
+  0%, 100% {
+    background-size: 200% 200%;
+    background-position: left center;
+  }
+  50% {
+    background-size: 200% 200%;
+    background-position: right center;
+  }
+}
+
+.animate-gradient-x {
+  animation: gradient-x 3s ease infinite;
+  background-size: 200% 200%;
+}
+
+/* 自定义滚动条样式 */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.custom-scrollbar-dark {
+  scrollbar-width: thin;
+  scrollbar-color: #475569 #1e293b;
+}
+
+.custom-scrollbar-dark::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar-dark::-webkit-scrollbar-track {
+  background: #1e293b;
+  border-radius: 4px;
+}
+
+.custom-scrollbar-dark::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
+}
+
+.custom-scrollbar-dark::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* 简洁模式滚动区域样式 */
+.simple-mode-content {
+  padding-bottom: 160px !important;
+}
+
+.simple-mode-input {
+  backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* 进度指示器悬停效果 */
+.progress-indicator {
+  transition: all 0.2s ease-in-out;
+}
+
+.progress-indicator:hover {
+  transform: translateX(4px);
+}
+
+/* 面板切换动画 */
+.panel-transition {
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 更慢的脉冲动画 */
+@keyframes slow-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.animate-slow-pulse {
+  animation: slow-pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

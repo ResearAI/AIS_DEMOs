@@ -1,5 +1,7 @@
 // lib/api.ts
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://ai-researcher.net:5000/api';
+import { useState, useEffect, useCallback } from 'react';
+
+const API_BASE_URL = 'http://ai-researcher.net:5000/api';
 
 export interface Activity {
   id: number;
@@ -10,6 +12,7 @@ export interface Activity {
   command?: string;
   filename?: string;
   path?: string;
+  speaker?: 'user' | 'ai';
 }
 
 export interface FileStructureNode {
@@ -68,20 +71,35 @@ export class ApiService {
     return eventSource;
   }
 
-  async pauseTask(taskId: string) {
+  async pauseTask(taskId: string): Promise<{ is_paused: boolean }> {
     const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/pause`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      }
     });
+    
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(`Failed to pause/resume task: ${response.statusText}`);
     }
+    
     return response.json();
   }
 
-  async exportTask(taskId: string) {
+  async saveFileContent(taskId: string, filename: string, content: string): Promise<{ success: boolean; message?: string }> {
+    const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/save-file`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ filename, content }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to save file: ${response.statusText}`);
+    }
+    
+    return response.json();
+  }
+
+  async exportTask(taskId: string): Promise<Blob> {
     const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/export`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -104,13 +122,89 @@ export class ApiService {
     }
     return response.json();
   }
+
+  async sendUserMessage(taskId: string, message: string): Promise<{ success: boolean; message_id?: number }> {
+    const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/send-message`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ message }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to send message: ${response.statusText}`);
+    }
+    
+    return response.json();
+  }
+
+  async createFile(taskId: string, filename: string, content: string = '', type: 'file' | 'folder' = 'file'): Promise<{ success: boolean; filename?: string; file_structure?: any }> {
+    const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/create-file`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ filename, content, type }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Failed to create file: ${response.statusText}`);
+    }
+    
+    return response.json();
+  }
+
+  async deleteFile(taskId: string, filename: string): Promise<{ success: boolean; filename?: string; file_structure?: any }> {
+    const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/delete-file`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ filename }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Failed to delete file: ${response.statusText}`);
+    }
+    
+    return response.json();
+  }
+
+  async renameFile(taskId: string, oldName: string, newName: string): Promise<{ success: boolean; old_name?: string; new_name?: string; file_structure?: any }> {
+    const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/rename-file`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ old_name: oldName, new_name: newName }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Failed to rename file: ${response.statusText}`);
+    }
+    
+    return response.json();
+  }
+
+  async getFileStructure(taskId: string): Promise<{ success: boolean; file_structure?: any; files_count?: number }> {
+    const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/file-structure`);
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Failed to get file structure: ${response.statusText}`);
+    }
+    
+    return response.json();
+  }
 }
 
 export const apiService = new ApiService();
 
 // React Hook for streaming task data
-import { useState, useEffect, useCallback } from 'react';
-
 export interface UseTaskStreamResult {
   activities: Activity[];
   currentFile: string;

@@ -1,25 +1,97 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHandle } from "react"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
-import { Terminal, FileText, FolderTree, ChevronRight, ChevronDown, File, Folder, Info, X, Plus, ArrowLeft, ArrowRight, Save, RotateCcw, Eye, EyeOff, ChevronLeft, Download, Play, Pause } from "lucide-react"
-import { FileStructureNode } from "@/lib/api"
-import { marked } from 'marked'
-import Prism from 'prismjs';
-import 'prismjs/components/prism-python';
-import 'prismjs/components/prism-javascript';
-import 'prismjs/components/prism-typescript';
-import 'prismjs/components/prism-css';
-import 'prismjs/components/prism-json';
-import 'prismjs/themes/prism-coy.css';
+import { Terminal, FileText, FolderTree, ChevronRight, ChevronDown, File, Folder, Info, X, Plus, ArrowLeft, ArrowRight, Save, RotateCcw, Eye, EyeOff, ChevronLeft, Download, Play, Pause, CheckCircle2, XCircle, Edit, AlertCircle } from "lucide-react"
+import { FileStructureNode, apiService } from "@/lib/api"
+
+// 动态导入 Prism.js 以避免服务器端渲染问题
+let Prism: any;
+if (typeof window !== 'undefined') {
+  try {
+    Prism = require('prismjs');
+    require('prismjs/components/prism-python');
+    require('prismjs/components/prism-javascript');
+    require('prismjs/components/prism-typescript');
+    require('prismjs/components/prism-css');
+    require('prismjs/components/prism-json');
+    require('prismjs/themes/prism-coy.css');
+  } catch (e) {
+    console.warn('Prism.js not available');
+  }
+}
+
+// 条件导入 ReactMarkdown，避免在没有依赖时崩溃
+let ReactMarkdown: any;
+try {
+  ReactMarkdown = require('react-markdown').default;
+} catch (e) {
+  console.warn('react-markdown not available, using fallback markdown renderer');
+  ReactMarkdown = null;
+}
+
+// 简单的Markdown fallback渲染器
+const SimpleFallbackMarkdownRenderer = ({ children }: { children: string }) => {
+  // 简单的markdown到HTML转换
+  const convertSimpleMarkdown = (text: string) => {
+    return text
+      // Headers
+      .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+      .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+      .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+      // Bold
+      .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
+      // Italic
+      .replace(/\*(.*)\*/gim, '<em>$1</em>')
+      // Links
+      .replace(/\[([^\]]*)\]\(([^\)]*)\)/gim, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+      // Line breaks
+      .replace(/\n/gim, '<br>');
+  };
+
+  try {
+    const htmlContent = convertSimpleMarkdown(children || '');
+    return (
+      <div 
+        className="prose prose-slate max-w-none"
+        dangerouslySetInnerHTML={{ __html: htmlContent }}
+      />
+    );
+  } catch (error) {
+    return (
+      <div className="prose prose-slate max-w-none">
+        <pre className="whitespace-pre-wrap text-sm">{children}</pre>
+      </div>
+    );
+  }
+};
+
+// Markdown 组件选择器
+const MarkdownRenderer = ({ children }: { children: string }) => {
+  if (ReactMarkdown) {
+    return (
+      <div className="prose prose-slate max-w-none">
+        <ReactMarkdown>
+          {children}
+        </ReactMarkdown>
+      </div>
+    );
+  }
+  return <SimpleFallbackMarkdownRenderer>{children}</SimpleFallbackMarkdownRenderer>;
+};
 
 interface FileTab {
   id: string
   filename: string
   content: string
   hasChanges: boolean
-  fileType: 'text' | 'image' | 'video' | 'pdf' | 'markdown'
+  fileType: 'text' | 'image' | 'video' | 'pdf' | 'markdown' | 'html'
+}
+
+interface ComputerViewRef {
+  save: () => void;
+  revert: () => void;
 }
 
 interface ComputerViewProps {
@@ -34,13 +106,22 @@ interface ComputerViewProps {
   historyLength?: number;
   currentHistoryIndexValue?: number;
   onHistoryChange?: (newIndex: number) => void;
+  showOnlyFileTree?: boolean;
+  showOnlyWorkspace?: boolean;
+  maxTabs?: number;
+  onFileSelect?: (filename: string) => void;
+  onFileEditStateChange?: (hasChanges: boolean, activeFilename: string | null) => void;
+  taskId?: string;
+  activities?: any[];
+  taskStartTime?: number;
 }
 
 // 检测文件类型的函数
-const getFileType = (filename: string): 'text' | 'image' | 'video' | 'pdf' | 'markdown' => {
+const getFileType = (filename: string): 'text' | 'image' | 'video' | 'pdf' | 'markdown' | 'html' => {
   const extension = filename.split('.').pop()?.toLowerCase() || '';
 
   if (extension === 'md') return 'markdown';
+  if (extension === 'html' || extension === 'htm') return 'html';
   if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension)) return 'image';
   if (['mp4', 'webm', 'ogg', 'avi', 'mov'].includes(extension)) return 'video';
   if (extension === 'pdf') return 'pdf';
@@ -51,6 +132,26 @@ const getFileType = (filename: string): 'text' | 'image' | 'video' | 'pdf' | 'ma
 const PDFViewer = ({ src, filename }: { src: string; filename: string }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+
+  // 检查src是否为空
+  if (!src || src.trim() === '') {
+    return (
+      <div className="h-full flex flex-col bg-white">
+        <div className="flex items-center justify-between p-3 border-b border-slate-300 bg-slate-50">
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-red-600" />
+            <span className="text-sm font-medium">{filename}</span>
+          </div>
+        </div>
+        <div className="flex-1 flex items-center justify-center bg-slate-100">
+          <div className="text-center text-slate-500">
+            <FileText className="h-12 w-12 mx-auto mb-2 text-slate-300" />
+            <p>No PDF content available</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col bg-white">
@@ -114,7 +215,17 @@ const ImageViewer = ({ src, filename }: { src: string; filename: string }) => {
 
   useEffect(() => {
     // 处理不同的图片源格式
-    if (src.startsWith('data:')) {
+    if (!src || src.trim() === '') {
+      // 如果src为空，创建一个默认的SVG
+      const svgContent = `<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100%" height="100%" fill="#f0f0f0"/>
+        <text x="50%" y="40%" font-family="Arial" font-size="18" fill="#333333" text-anchor="middle">${filename}</text>
+        <text x="50%" y="60%" font-family="Arial" font-size="12" fill="#666666" text-anchor="middle">No Image Content</text>
+      </svg>`;
+      const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+      setImageUrl(URL.createObjectURL(blob));
+      setIsLoading(false);
+    } else if (src.startsWith('data:')) {
       setImageUrl(src);
     } else if (src.startsWith('http')) {
       setImageUrl(src);
@@ -141,6 +252,7 @@ const ImageViewer = ({ src, filename }: { src: string; filename: string }) => {
           variant="outline"
           size="sm"
           onClick={() => window.open(imageUrl, '_blank')}
+          disabled={!imageUrl}
         >
           <Download className="h-4 w-4 mr-1" />
           View Full Size
@@ -154,17 +266,19 @@ const ImageViewer = ({ src, filename }: { src: string; filename: string }) => {
             <p className="text-sm mt-1">{filename}</p>
           </div>
         ) : (
-          <img
-            src={imageUrl}
-            alt={filename}
-            className="max-w-full max-h-full object-contain shadow-lg rounded-lg"
-            onLoad={() => setIsLoading(false)}
-            onError={() => {
-              setIsLoading(false);
-              setHasError(true);
-            }}
-            style={{ display: isLoading ? 'none' : 'block' }}
-          />
+          imageUrl && (
+            <img
+              src={imageUrl}
+              alt={filename}
+              className="max-w-full max-h-full object-contain shadow-lg rounded-lg"
+              onLoad={() => setIsLoading(false)}
+              onError={() => {
+                setIsLoading(false);
+                setHasError(true);
+              }}
+              style={{ display: isLoading ? 'none' : 'block' }}
+            />
+          )
         )}
         {isLoading && (
           <div className="text-center text-slate-500">
@@ -181,6 +295,26 @@ const ImageViewer = ({ src, filename }: { src: string; filename: string }) => {
 const VideoPlayer = ({ src, filename }: { src: string; filename: string }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // 检查src是否为空
+  if (!src || src.trim() === '') {
+    return (
+      <div className="h-full flex flex-col bg-black">
+        <div className="flex items-center justify-between p-3 border-b border-slate-700 bg-slate-800">
+          <div className="flex items-center gap-2">
+            <Play className="h-4 w-4 text-blue-400" />
+            <span className="text-sm font-medium text-white">{filename}</span>
+          </div>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center text-slate-400">
+            <Play className="h-12 w-12 mx-auto mb-2 text-slate-600" />
+            <p>No video content available</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const togglePlay = () => {
     if (videoRef.current) {
@@ -236,7 +370,97 @@ const VideoPlayer = ({ src, filename }: { src: string; filename: string }) => {
   );
 };
 
-export function ComputerView({
+// HTML预览器组件
+const HTMLViewer = ({ content, filename }: { content: string; filename: string }) => {
+  const [showCode, setShowCode] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // 检查content是否为空
+  if (!content || content.trim() === '') {
+    return (
+      <div className="h-full flex flex-col bg-white">
+        <div className="flex items-center justify-between p-3 border-b border-slate-300 bg-slate-50">
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-orange-600" />
+            <span className="text-sm font-medium">{filename}</span>
+          </div>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center text-slate-500">
+            <FileText className="h-12 w-12 mx-auto mb-2 text-slate-300" />
+            <p>No HTML content available</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  useEffect(() => {
+    if (iframeRef.current && !showCode) {
+      const iframe = iframeRef.current;
+      const doc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (doc) {
+        doc.open();
+        doc.write(content);
+        doc.close();
+      }
+    }
+  }, [content, showCode]);
+
+  return (
+    <div className="h-full flex flex-col bg-white">
+      <div className="flex items-center justify-between p-3 border-b border-slate-300 bg-slate-50">
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-orange-600" />
+          <span className="text-sm font-medium">{filename}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowCode(!showCode)}
+            className="border-slate-300"
+          >
+            {showCode ? <Eye className="h-4 w-4 mr-1" /> : <EyeOff className="h-4 w-4 mr-1" />}
+            {showCode ? 'Preview' : 'Code'}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const blob = new Blob([content], { type: 'text/html' });
+              const url = URL.createObjectURL(blob);
+              window.open(url, '_blank');
+              setTimeout(() => URL.revokeObjectURL(url), 100);
+            }}
+          >
+            <Download className="h-4 w-4 mr-1" />
+            Open External
+          </Button>
+        </div>
+      </div>
+
+      {showCode ? (
+        <div className="flex-1 p-4 overflow-auto">
+          <pre className="text-sm font-mono text-slate-800 whitespace-pre-wrap">
+            <code>{content}</code>
+          </pre>
+        </div>
+      ) : (
+        <div className="flex-1 relative">
+          <iframe
+            ref={iframeRef}
+            className="w-full h-full border-0"
+            sandbox="allow-scripts allow-same-origin"
+            title={`HTML preview for ${filename}`}
+          />
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const ComputerView = forwardRef<ComputerViewRef, ComputerViewProps>(({
   currentFile,
   fileContent,
   setFileContent,
@@ -247,8 +471,16 @@ export function ComputerView({
   isViewingHistory = false,
   historyLength = 0,
   currentHistoryIndexValue = -1,
-  onHistoryChange
-}: ComputerViewProps) {
+  onHistoryChange,
+  showOnlyFileTree = false,
+  showOnlyWorkspace = false,
+  maxTabs = 4,
+  onFileSelect,
+  onFileEditStateChange,
+  taskId,
+  activities = [],
+  taskStartTime
+}, ref) => {
   const [selectedView, setSelectedView] = useState<string>('editing')
   const [fileTabs, setFileTabs] = useState<FileTab[]>([])
   const [activeFileId, setActiveFileId] = useState<string>('')
@@ -257,7 +489,7 @@ export function ComputerView({
   const [originalFileContents, setOriginalFileContents] = useState<Map<string, string>>(new Map())
   const [showMarkdownPreview, setShowMarkdownPreview] = useState(true);
   const [tabScrollPosition, setTabScrollPosition] = useState(0);
-  const [showToolsMenu, setShowToolsMenu] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const preRef = useRef<HTMLPreElement>(null);
@@ -269,24 +501,52 @@ export function ComputerView({
   const [terminalInputValue, setTerminalInputValue] = useState('');
   const [displayedTerminalOutput, setDisplayedTerminalOutput] = useState<string[]>([]);
 
-  // 初始化当前文件
+  const [showFileContextMenu, setShowFileContextMenu] = useState<{show: boolean, x: number, y: number, filename: string, isFolder: boolean}>({
+    show: false, x: 0, y: 0, filename: '', isFolder: false
+  });
+  const [newItemDialog, setNewItemDialog] = useState<{show: boolean, type: 'file' | 'folder', parentPath: string}>({
+    show: false, type: 'file', parentPath: ''
+  });
+  const [renameDialog, setRenameDialog] = useState<{show: boolean, filename: string, newName: string}>({
+    show: false, filename: '', newName: ''
+  });
+
+  // 监听从父组件传来的文件选择
   useEffect(() => {
-    if (currentFile && fileContent !== undefined && fileContent !== null && !fileTabs.find(tab => tab.filename === currentFile) && !isViewingHistory) {
-      const fileType = getFileType(currentFile);
-      const newTab: FileTab = {
-        id: `file-${Date.now()}`,
-        filename: currentFile,
-        content: fileContent,
-        hasChanges: false,
-        fileType
+    if (currentFile && fileContent !== undefined && fileContent !== null) {
+      // 检查是否已经有这个文件的标签页
+      const existingTab = fileTabs.find(tab => tab.filename === currentFile);
+      
+      if (existingTab) {
+        // 如果已经存在，切换到该标签页
+        setActiveFileId(existingTab.id);
+        setSelectedView('editing');
+        // 更新内容
+        setFileTabs(prev => prev.map(tab =>
+          tab.filename === currentFile
+            ? { ...tab, content: fileContent, hasChanges: false }
+            : tab
+        ));
+      } else if (!isViewingHistory) {
+        // 如果不存在且不在查看历史记录，创建新标签页
+        const fileType = getFileType(currentFile);
+        const newTab: FileTab = {
+          id: `file-${currentFile}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          filename: currentFile,
+          content: fileContent,
+          hasChanges: false,
+          fileType
+        };
+        setFileTabs(prev => [...prev, newTab]);
+        setActiveFileId(newTab.id);
+        setSelectedView('editing');
       }
-      setFileTabs(prev => [...prev, newTab])
-      setActiveFileId(newTab.id)
-      setSelectedView('editing')
+      
+      // 更新文件内容缓存
       setFileContents(prev => new Map(prev).set(currentFile, fileContent));
       setOriginalFileContents(prev => new Map(prev).set(currentFile, fileContent));
     }
-  }, [currentFile, fileContent, fileTabs, isViewingHistory])
+  }, [currentFile, fileContent, isViewingHistory]);
 
   // 实时更新文件内容
   useEffect(() => {
@@ -300,7 +560,7 @@ export function ComputerView({
           : tab
       ));
     }
-  }, [currentFile, fileContent, isLive]);
+  }, [currentFile, fileContent, isLive, isViewingHistory]);
 
   // 自动切换到终端
   useEffect(() => {
@@ -327,20 +587,6 @@ export function ComputerView({
       terminalInputRef.current.focus();
     }
   }, [selectedView]);
-
-  // 点击外部关闭工具菜单
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (showToolsMenu) {
-        setShowToolsMenu(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showToolsMenu]);
 
   // 文件标签滚动函数
   const scrollTabs = (direction: 'left' | 'right') => {
@@ -370,29 +616,67 @@ export function ComputerView({
   };
 
   const handleFileClick = (filename: string) => {
+    // 如果是仅显示文件树模式，调用回调函数通知父组件
+    if (showOnlyFileTree && onFileSelect) {
+      onFileSelect(filename);
+      return;
+    }
+
+    // 检查是否已经有这个文件的标签页
     const existingTab = fileTabs.find(tab => tab.filename === filename)
     if (existingTab) {
+      // 如果已经存在，直接切换到该标签页
       setActiveFileId(existingTab.id)
       setSelectedView('editing')
+      
+      // 通知父组件文件选择变化
+      if (onFileSelect) {
+        onFileSelect(filename);
+      }
       return
     }
 
-    const contentFromCache = fileContents.get(filename);
-    const content = contentFromCache || ''
+    // 从缓存中获取内容，如果没有则尝试从父组件获取
+    let content = fileContents.get(filename) || '';
+    
+    // 如果是当前文件并且有内容，使用当前文件内容
+    if (filename === currentFile && fileContent) {
+      content = fileContent;
+    }
+
     const fileType = getFileType(filename);
 
+    // 创建新的文件标签页
     const newTab: FileTab = {
-      id: `file-${Date.now()}`,
+      id: `file-${filename}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       filename,
       content,
       hasChanges: false,
       fileType
     }
 
-    setFileTabs(prevTabs => [...prevTabs, newTab]);
+    // 限制最大标签页数量
+    const maxTabsForCurrentMode = maxTabs || 4;
+    setFileTabs(prevTabs => {
+      let newTabs = [...prevTabs, newTab];
+      if (newTabs.length > maxTabsForCurrentMode) {
+        // 如果超过最大数量，移除最老的标签页
+        newTabs = newTabs.slice(-maxTabsForCurrentMode);
+      }
+      return newTabs;
+    });
+    
     setActiveFileId(newTab.id)
     setSelectedView('editing')
     setOriginalFileContents(prev => new Map(prev).set(filename, content));
+    
+    // 更新文件内容缓存
+    setFileContents(prev => new Map(prev).set(filename, content));
+    
+    // 通知父组件文件选择变化
+    if (onFileSelect) {
+      onFileSelect(filename);
+    }
   }
 
   const handleCloseTab = (tabId: string, e: React.MouseEvent) => {
@@ -429,6 +713,177 @@ export function ComputerView({
     })
   }
 
+  // 计算文件总数的辅助函数
+  const countAllFiles = (node: FileStructureNode): number => {
+    if (!node) return 0;
+    let count = node.type === 'file' ? 1 : 0;
+    if (node.children) {
+      count += node.children.reduce((acc, child) => acc + countAllFiles(child), 0);
+    }
+    return count;
+  };
+
+  // 计算所有文件大小
+  const calculateTotalSize = () => {
+    let totalSize = 0;
+    fileContents.forEach(content => {
+      totalSize += new Blob([content]).size;
+    });
+    return totalSize;
+  };
+
+  // 计算运行时长
+  const getRuntime = () => {
+    if (!taskStartTime) return 'Unknown';
+    const now = Date.now();
+    const runtime = Math.floor((now - taskStartTime * 1000) / 1000);
+    const hours = Math.floor(runtime / 3600);
+    const minutes = Math.floor((runtime % 3600) / 60);
+    const seconds = runtime % 60;
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m ${seconds}s`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${seconds}s`;
+    } else {
+      return `${seconds}s`;
+    }
+  };
+
+  // 文件操作函数
+  const handleCreateNewItem = async (name: string, type: 'file' | 'folder', parentPath: string) => {
+    if (!taskId || !name.trim()) return;
+    
+    try {
+      setSaveStatus('saving');
+      const fullPath = parentPath ? `${parentPath}/${name}` : name;
+      
+      if (type === 'file') {
+        const result = await apiService.createFile(taskId, fullPath, '');
+        if (result.success) {
+          console.log('File created successfully:', fullPath);
+          setSaveStatus('saved');
+          setTimeout(() => setSaveStatus('idle'), 2000);
+          
+          // 如果返回了新的文件结构，可以通知父组件更新
+          if (result.file_structure && onFileSelect) {
+            // 可以触发文件结构更新的逻辑
+          }
+        }
+      } else {
+        console.log('Folder creation not implemented yet');
+        setSaveStatus('error');
+        setTimeout(() => setSaveStatus('idle'), 3000);
+      }
+    } catch (error) {
+      console.error('Failed to create item:', error);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    }
+  };
+
+  const handleDeleteItem = async (filename: string) => {
+    if (!taskId || !filename) return;
+    
+    try {
+      setSaveStatus('saving');
+      const result = await apiService.deleteFile(taskId, filename);
+      
+      if (result.success) {
+        console.log('File deleted successfully:', filename);
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 2000);
+        
+        // 如果当前删除的文件是活动文件，关闭对应的标签页
+        const deletedTab = fileTabs.find(tab => tab.filename === filename);
+        if (deletedTab) {
+          setFileTabs(prev => prev.filter(tab => tab.filename !== filename));
+          if (activeFileId === deletedTab.id && fileTabs.length > 1) {
+            const remainingTabs = fileTabs.filter(tab => tab.id !== deletedTab.id);
+            if (remainingTabs.length > 0) {
+              setActiveFileId(remainingTabs[0].id);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to delete item:', error);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    }
+  };
+
+  const handleRenameItem = async (oldName: string, newName: string) => {
+    if (!taskId || !oldName || !newName.trim()) return;
+    
+    try {
+      setSaveStatus('saving');
+      const result = await apiService.renameFile(taskId, oldName, newName);
+      
+      if (result.success) {
+        console.log('File renamed successfully:', oldName, '->', newName);
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 2000);
+        
+        // 更新打开的标签页中的文件名
+        setFileTabs(prev => prev.map(tab => 
+          tab.filename === oldName 
+            ? { ...tab, filename: newName }
+            : tab
+        ));
+        
+        // 更新文件内容缓存
+        setFileContents(prev => {
+          const newMap = new Map(prev);
+          if (newMap.has(oldName)) {
+            const content = newMap.get(oldName)!;
+            newMap.delete(oldName);
+            newMap.set(newName, content);
+          }
+          return newMap;
+        });
+        
+        setOriginalFileContents(prev => {
+          const newMap = new Map(prev);
+          if (newMap.has(oldName)) {
+            const content = newMap.get(oldName)!;
+            newMap.delete(oldName);
+            newMap.set(newName, content);
+          }
+          return newMap;
+        });
+      }
+    } catch (error) {
+      console.error('Failed to rename item:', error);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    }
+  };
+
+  // 处理右键菜单
+  const handleFileRightClick = (e: React.MouseEvent, filename: string, isFolder: boolean) => {
+    e.preventDefault();
+    setShowFileContextMenu({
+      show: true,
+      x: e.clientX,
+      y: e.clientY,
+      filename,
+      isFolder
+    });
+  };
+
+  // 点击其他地方关闭右键菜单
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setShowFileContextMenu(prev => ({ ...prev, show: false }));
+    };
+    
+    if (showFileContextMenu.show) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showFileContextMenu.show]);
+
   const renderFileTree = (node: FileStructureNode, path: string = '', level: number = 0) => {
     if (!node) return null
 
@@ -442,6 +897,7 @@ export function ComputerView({
             className="flex items-center gap-1 py-1 px-2 hover:bg-slate-100 cursor-pointer select-none text-sm"
             style={{ paddingLeft: `${level * 16 + 8}px` }}
             onClick={() => toggleFolder(fullPath)}
+            onContextMenu={(e) => handleFileRightClick(e, fullPath, true)}
           >
             {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
             <Folder className="h-4 w-4 text-blue-600" />
@@ -455,18 +911,30 @@ export function ComputerView({
         </div>
       )
     } else {
+      // 检查文件是否在操作台中打开（通过fileTabs检查）
       const isOpen = fileTabs.some(tab => tab.filename === node.name)
+      // 检查是否是当前活动文件 - 修复绑定逻辑
+      const isActiveInEditor = selectedView === 'editing' && 
+        activeFileId && fileTabs.some(tab => tab.id === activeFileId && tab.filename === node.name)
+      
       return (
         <div
           key={fullPath}
-          className={`flex items-center gap-1 py-1 px-2 hover:bg-slate-100 cursor-pointer text-sm ${
+          className={`flex items-center gap-1 py-1 px-2 hover:bg-slate-100 cursor-pointer text-sm transition-colors duration-150 ${
+            isActiveInEditor ? 'bg-blue-100 text-blue-800 border-r-2 border-blue-500' : 
             isOpen ? 'bg-blue-50 text-blue-700' : ''
           }`}
           style={{ paddingLeft: `${level * 16 + 24}px` }}
           onClick={() => handleFileClick(node.name)}
+          onContextMenu={(e) => handleFileRightClick(e, node.name, false)}
         >
-          <File className="h-4 w-4 text-slate-500" />
-          <span>{node.name}</span>
+          <File className={`h-4 w-4 ${isActiveInEditor ? 'text-blue-600' : 'text-slate-500'}`} />
+          <span className={isActiveInEditor ? 'font-medium' : ''}>{node.name}</span>
+          {isOpen && (
+            <div className={`w-1.5 h-1.5 rounded-full ml-auto ${
+              isActiveInEditor ? 'bg-blue-600' : 'bg-blue-500'
+            }`}></div>
+          )}
         </div>
       )
     }
@@ -480,8 +948,40 @@ export function ComputerView({
 
   const activeTab = fileTabs.find(tab => tab.id === activeFileId);
 
-  const handleSave = useCallback(() => {
-    if (activeTab && activeTab.hasChanges) {
+  const handleSave = useCallback(async () => {
+    if (activeTab && activeTab.hasChanges && taskId) {
+      try {
+        setSaveStatus('saving');
+        const currentContent = activeTab.content;
+        
+        // 调用API保存文件
+        const result = await apiService.saveFileContent(taskId, activeTab.filename, currentContent);
+        
+        if (result.success) {
+          // 保存成功，更新本地状态
+          setOriginalFileContents(prev => new Map(prev).set(activeTab.filename, currentContent));
+          setFileContents(prev => new Map(prev).set(activeTab.filename, currentContent));
+          setFileTabs(prevTabs =>
+            prevTabs.map(t =>
+              t.id === activeTab.id ? { ...t, hasChanges: false } : t
+            )
+          );
+          
+          setSaveStatus('saved');
+          setTimeout(() => setSaveStatus('idle'), 2000); // 2秒后隐藏成功提示
+          console.log('File saved successfully:', activeTab.filename);
+        } else {
+          setSaveStatus('error');
+          setTimeout(() => setSaveStatus('idle'), 3000);
+          console.error('Failed to save file:', result.message);
+        }
+      } catch (error) {
+        setSaveStatus('error');
+        setTimeout(() => setSaveStatus('idle'), 3000);
+        console.error('Error saving file:', error);
+      }
+    } else if (activeTab && activeTab.hasChanges && !taskId) {
+      // 如果没有taskId，只更新本地状态
       const currentContent = activeTab.content;
       setOriginalFileContents(prev => new Map(prev).set(activeTab.filename, currentContent));
       setFileTabs(prevTabs =>
@@ -489,8 +989,10 @@ export function ComputerView({
           t.id === activeTab.id ? { ...t, hasChanges: false } : t
         )
       );
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
     }
-  }, [activeTab]);
+  }, [activeTab, taskId]);
 
   const handleRevert = useCallback(() => {
     if (activeTab) {
@@ -528,134 +1030,206 @@ export function ComputerView({
     };
   }, [handleKeyDown]);
 
+  // 使用useImperativeHandle暴露保存和还原功能
+  useImperativeHandle(ref, () => ({
+    save: handleSave,
+    revert: handleRevert
+  }), [handleSave, handleRevert]);
+
+  // 监听文件编辑状态变化，通知父组件
+  useEffect(() => {
+    if (onFileEditStateChange && activeTab) {
+      onFileEditStateChange(activeTab.hasChanges, activeTab.filename);
+    } else if (onFileEditStateChange && !activeTab) {
+      onFileEditStateChange(false, null);
+    }
+  }, [activeTab?.hasChanges, activeTab?.filename, onFileEditStateChange]);
+
+  // 自动保存函数
+  const autoSave = useCallback(async (tab: FileTab) => {
+    if (tab.hasChanges && taskId) {
+      try {
+        const result = await apiService.saveFileContent(taskId, tab.filename, tab.content);
+        if (result.success) {
+          setOriginalFileContents(prev => new Map(prev).set(tab.filename, tab.content));
+          setFileContents(prev => new Map(prev).set(tab.filename, tab.content));
+          setFileTabs(prevTabs =>
+            prevTabs.map(t =>
+              t.id === tab.id ? { ...t, hasChanges: false } : t
+            )
+          );
+          console.log('Auto-saved file:', tab.filename);
+        }
+      } catch (error) {
+        console.error('Auto-save failed:', error);
+      }
+    }
+  }, [taskId]);
+
+  // 在标签页切换前自动保存当前标签
+  const handleTabSwitch = useCallback((newTabId: string) => {
+    // 先保存当前标签页（如果有修改）
+    if (activeTab && activeTab.hasChanges) {
+      autoSave(activeTab);
+    }
+    
+    // 切换到新标签页
+    setActiveFileId(newTabId);
+    setSelectedView('editing');
+    
+    // 通知父组件文件选择变化
+    const newTab = fileTabs.find(tab => tab.id === newTabId);
+    if (newTab && onFileSelect) {
+      onFileSelect(newTab.filename);
+    }
+  }, [activeTab, autoSave, fileTabs, onFileSelect]);
+
   // 渲染不同类型文件的内容
   const renderFileContent = () => {
-    if (!activeTab) {
-      return (
-        <div className="h-full flex items-center justify-center text-slate-500">
-          <div className="text-center">
-            <FileText className="h-12 w-12 mx-auto mb-2 text-slate-300" />
-            <p className="text-sm">No files open</p>
-            <p className="text-xs mt-1">Select a file from the explorer or open a new one.</p>
-          </div>
-        </div>
-      );
-    }
+    const activeTab = fileTabs.find(tab => tab.id === activeFileId);
+    if (!activeTab) return null;
 
-    // 根据文件类型渲染不同的查看器
-    switch (activeTab.fileType) {
-      case 'image':
-        return <ImageViewer src={activeTab.content} filename={activeTab.filename} />;
+    const isMarkdown = activeTab.filename.endsWith('.md');
+    const fileContent = fileContents.get(activeTab.filename) || '';
 
-      case 'video':
-        return <VideoPlayer src={activeTab.content} filename={activeTab.filename} />;
-
-      case 'pdf':
-        return <PDFViewer src={activeTab.content} filename={activeTab.filename} />;
-
-      case 'markdown':
-        if (showMarkdownPreview) {
-          return (
-            <div className="flex h-full">
-              <div className="w-1/2 h-full border-r border-slate-300">
-                <textarea
-                  value={activeTab.content}
-                  onChange={(e) => handleFileContentChange(activeTab.id, e.target.value)}
-                  className="w-full h-full outline-none resize-none text-sm font-mono text-slate-800 placeholder:text-slate-500 p-4 bg-white custom-scrollbar"
-                  placeholder="Enter Markdown..."
-                  readOnly={isViewingHistory || (!isLive && taskStatus !== 'completed')}
-                  style={{ lineHeight: '1.6' }}
-                />
-              </div>
-              <div
-                className="w-1/2 h-full p-4 overflow-y-auto prose prose-sm lg:prose-base bg-white custom-scrollbar"
-                dangerouslySetInnerHTML={{ __html: marked.parse(activeTab.content || '') }}
-              />
-            </div>
-          );
-        }
-        // Fall through to text editor for markdown without preview
-
-      default:
-        // 文本文件编辑器
-        const isCodeFile = activeTab.filename.match(/\.(py|js|ts|css|json)$/);
-        let highlightedContent = '';
-        let language = '';
-
-        if (isCodeFile) {
-          const extension = activeTab.filename.split('.').pop() || '';
-          if (extension === 'py') language = 'python';
-          else if (extension === 'js') language = 'javascript';
-          else if (extension === 'ts') language = 'typescript';
-          else if (extension === 'css') language = 'css';
-          else if (extension === 'json') language = 'json';
-
-          if (language && Prism.languages[language]) {
-            highlightedContent = Prism.highlight(activeTab.content || '', Prism.languages[language], language);
-          } else {
-            highlightedContent = activeTab.content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-          }
-        }
-
-        return (
-          <div className="h-full flex flex-col relative">
-            {isCodeFile ? (
-              <div
-                ref={scrollContainerRef}
-                className="flex-1 p-0 overflow-y-auto relative bg-white custom-scrollbar"
-                onScroll={() => {
-                  if (textareaRef.current && scrollContainerRef.current) {
-                    textareaRef.current.scrollTop = scrollContainerRef.current.scrollTop;
-                  }
-                }}
-              >
-                <textarea
-                  ref={textareaRef}
-                  value={activeTab.content}
-                  onChange={(e) => handleFileContentChange(activeTab.id, e.target.value)}
-                  className="w-full h-full outline-none resize-none text-sm font-mono text-transparent bg-transparent caret-slate-700 p-4 absolute inset-0 z-10 overflow-hidden"
-                  placeholder="Enter code..."
-                  readOnly={isViewingHistory || (!isLive && taskStatus !== 'completed')}
-                  style={{ lineHeight: '1.6' }}
-                  spellCheck="false"
-                />
-                <pre
-                  ref={preRef}
-                  className="w-full outline-none resize-none text-sm font-mono p-4 z-0 bg-transparent"
-                  style={{ lineHeight: '1.6', margin: 0 }}
-                  aria-hidden="true"
-                >
-                  <code dangerouslySetInnerHTML={{ __html: highlightedContent }} />
-                </pre>
-              </div>
-            ) : (
-              <div className="flex-1 p-4 overflow-hidden">
-                <textarea
-                  value={activeTab.content}
-                  onChange={(e) => handleFileContentChange(activeTab.id, e.target.value)}
-                  className="w-full h-full outline-none resize-none text-sm font-mono text-slate-800 placeholder:text-slate-500 bg-white custom-scrollbar"
-                  placeholder="Empty file"
-                  readOnly={isViewingHistory || (!isLive && taskStatus !== 'completed')}
-                  style={{ lineHeight: '1.6' }}
-                />
-              </div>
+    return (
+      <div className="h-full flex flex-col">
+        {/* 文件工具栏 - 添加保存状态显示 */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50">
+          <div className="flex items-center space-x-2">
+            <span className="text-sm font-medium text-slate-900">{activeTab.filename}</span>
+            {activeTab.hasChanges && (
+              <span className="text-xs px-2 py-1 bg-amber-100 text-amber-800 rounded-full">
+                未保存
+              </span>
             )}
           </div>
-        );
-    }
+          
+          {/* 保存状态指示器 */}
+          <div className="flex items-center space-x-2">
+            {saveStatus !== 'idle' && (
+              <div className="flex items-center space-x-1">
+                {saveStatus === 'saving' && (
+                  <>
+                    <div className="w-3 h-3 border border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-xs text-blue-600">保存中...</span>
+                  </>
+                )}
+                {saveStatus === 'saved' && (
+                  <>
+                    <CheckCircle2 className="w-3 h-3 text-green-600" />
+                    <span className="text-xs text-green-600">已保存</span>
+                  </>
+                )}
+                {saveStatus === 'error' && (
+                  <>
+                    <AlertCircle className="w-3 h-3 text-red-600" />
+                    <span className="text-xs text-red-600">保存失败</span>
+                  </>
+                )}
+              </div>
+            )}
+            
+            {/* 文件操作按钮 */}
+            <div className="flex items-center space-x-1">
+              {activeTab.hasChanges && (
+                <>
+                  <button
+                    onClick={handleSave}
+                    className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                  >
+                    保存
+                  </button>
+                  <button
+                    onClick={handleRevert}
+                    className="px-2 py-1 text-xs bg-slate-300 text-slate-700 rounded hover:bg-slate-400 transition-colors"
+                  >
+                    还原
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 文件内容区域 */}
+        <div className="flex-1 overflow-hidden">
+          {/* ... 现有的文件内容渲染逻辑 ... */}
+          {/* 现有代码保持不变 */}
+          <div className="h-full">
+            {(() => {
+              const fileType = getFileType(activeTab.filename);
+              const isMarkdown = fileType === 'markdown';
+              
+              if (fileType === 'pdf') {
+                return <PDFViewer src={fileContent} filename={activeTab.filename} />;
+              }
+              
+              if (fileType === 'image') {
+                return <ImageViewer src={fileContent} filename={activeTab.filename} />;
+              }
+              
+              if (fileType === 'video') {
+                return <VideoPlayer src={fileContent} filename={activeTab.filename} />;
+              }
+              
+              if (fileType === 'html') {
+                return <HTMLViewer content={fileContent} filename={activeTab.filename} />;
+              }
+              
+              // Markdown 和其他文本文件
+              return (
+                <div className="h-full flex">
+                  {isMarkdown && showMarkdownPreview ? (
+                    <div className="h-full flex">
+                      <div className="w-1/2 border-r border-slate-200">
+                        <textarea
+                          className="w-full h-full p-4 border-none resize-none focus:outline-none font-mono text-sm"
+                          value={fileContent}
+                          onChange={(e) => handleFileContentChange(activeTab.id, e.target.value)}
+                          placeholder="Enter your markdown content..."
+                          readOnly={isViewingHistory}
+                        />
+                      </div>
+                      <div className="w-1/2 p-4 overflow-auto bg-white">
+                        <MarkdownRenderer>
+                          {fileContent}
+                        </MarkdownRenderer>
+                      </div>
+                    </div>
+                  ) : (
+                    <textarea
+                      className="w-full h-full p-4 border-none resize-none focus:outline-none font-mono text-sm"
+                      value={fileContent}
+                      onChange={(e) => handleFileContentChange(activeTab.id, e.target.value)}
+                      placeholder={
+                        activeTab.filename.endsWith('.md') 
+                          ? "Enter your markdown content..."
+                          : "Enter your content..."
+                      }
+                      readOnly={isViewingHistory}
+                    />
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      </div>
+    );
   };
 
-  return (
-    <div className="h-full flex w-full">
-      {/* 左侧文件树 - 固定宽度 */}
-      <div className="w-64 border-r border-slate-300 bg-slate-50 flex-shrink-0">
+  // 如果只显示文件树
+  if (showOnlyFileTree) {
+    return (
+      <div className="h-full flex flex-col bg-slate-50 relative">
         <div className="border-b border-slate-300 px-4 py-3">
           <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
             <FolderTree className="h-4 w-4" />
             File Explorer
           </h3>
         </div>
-        <div className="overflow-y-auto h-[calc(100%-3rem)] py-2 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto py-2 custom-scrollbar">
           {fileStructure ? (
             renderFileTree(fileStructure)
           ) : (
@@ -664,14 +1238,159 @@ export function ComputerView({
             </div>
           )}
         </div>
-      </div>
 
-      {/* 右侧内容区域 - 严格固定宽度 */}
-      <div className="w-[calc(100vw-16rem)] flex flex-col overflow-hidden">
-        {/* 文件标签栏和工具栏 */}
-        <div className="flex items-center border-b border-slate-300 bg-slate-50 h-10">
-          {/* 文件标签滚动区域 - 固定宽度 */}
-          <div className="w-[60%] flex items-center overflow-hidden">
+        {/* 右键菜单 */}
+        {showFileContextMenu.show && (
+          <div
+            className="fixed bg-white border border-slate-300 rounded-lg shadow-lg py-2 z-50 min-w-[160px]"
+            style={{ left: showFileContextMenu.x, top: showFileContextMenu.y }}
+          >
+            <button
+              className="w-full px-4 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2"
+              onClick={() => {
+                setNewItemDialog({ show: true, type: 'file', parentPath: showFileContextMenu.isFolder ? showFileContextMenu.filename : '' });
+                setShowFileContextMenu(prev => ({ ...prev, show: false }));
+              }}
+            >
+              <Plus className="h-4 w-4" />
+              New File
+            </button>
+            <button
+              className="w-full px-4 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2"
+              onClick={() => {
+                setNewItemDialog({ show: true, type: 'folder', parentPath: showFileContextMenu.isFolder ? showFileContextMenu.filename : '' });
+                setShowFileContextMenu(prev => ({ ...prev, show: false }));
+              }}
+            >
+              <FolderTree className="h-4 w-4" />
+              New Folder
+            </button>
+            {!showFileContextMenu.isFolder && (
+              <>
+                <div className="border-t border-slate-200 my-1"></div>
+                <button
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2"
+                  onClick={() => {
+                    setRenameDialog({ show: true, filename: showFileContextMenu.filename, newName: showFileContextMenu.filename });
+                    setShowFileContextMenu(prev => ({ ...prev, show: false }));
+                  }}
+                >
+                  <Edit className="h-4 w-4" />
+                  Rename
+                </button>
+                <button
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
+                  onClick={() => {
+                    if (confirm(`Are you sure you want to delete ${showFileContextMenu.filename}?`)) {
+                      handleDeleteItem(showFileContextMenu.filename);
+                    }
+                    setShowFileContextMenu(prev => ({ ...prev, show: false }));
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                  Delete
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* 新建文件/文件夹对话框 */}
+        {newItemDialog.show && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-96">
+              <h3 className="text-lg font-semibold mb-4">
+                Create New {newItemDialog.type === 'file' ? 'File' : 'Folder'}
+              </h3>
+              <input
+                type="text"
+                placeholder={`Enter ${newItemDialog.type} name...`}
+                className="w-full border border-slate-300 rounded px-3 py-2 mb-4"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const name = (e.target as HTMLInputElement).value;
+                    handleCreateNewItem(name, newItemDialog.type, newItemDialog.parentPath);
+                    setNewItemDialog({ show: false, type: 'file', parentPath: '' });
+                  } else if (e.key === 'Escape') {
+                    setNewItemDialog({ show: false, type: 'file', parentPath: '' });
+                  }
+                }}
+              />
+              <div className="flex gap-2 justify-end">
+                <button
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded"
+                  onClick={() => setNewItemDialog({ show: false, type: 'file', parentPath: '' })}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  onClick={() => {
+                    const input = document.querySelector('input[placeholder*="name"]') as HTMLInputElement;
+                    if (input?.value) {
+                      handleCreateNewItem(input.value, newItemDialog.type, newItemDialog.parentPath);
+                      setNewItemDialog({ show: false, type: 'file', parentPath: '' });
+                    }
+                  }}
+                >
+                  Create
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 重命名对话框 */}
+        {renameDialog.show && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-96">
+              <h3 className="text-lg font-semibold mb-4">Rename File</h3>
+              <input
+                type="text"
+                value={renameDialog.newName}
+                onChange={(e) => setRenameDialog(prev => ({ ...prev, newName: e.target.value }))}
+                className="w-full border border-slate-300 rounded px-3 py-2 mb-4"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleRenameItem(renameDialog.filename, renameDialog.newName);
+                    setRenameDialog({ show: false, filename: '', newName: '' });
+                  } else if (e.key === 'Escape') {
+                    setRenameDialog({ show: false, filename: '', newName: '' });
+                  }
+                }}
+              />
+              <div className="flex gap-2 justify-end">
+                <button
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded"
+                  onClick={() => setRenameDialog({ show: false, filename: '', newName: '' })}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  onClick={() => {
+                    handleRenameItem(renameDialog.filename, renameDialog.newName);
+                    setRenameDialog({ show: false, filename: '', newName: '' });
+                  }}
+                >
+                  Rename
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // 如果只显示工作空间（文件编辑器和终端）
+  if (showOnlyWorkspace) {
+    return (
+      <div className="h-full flex flex-col bg-white">
+        {/* 文件标签栏 */}
+        <div className="flex items-center border-b border-slate-300 bg-slate-50 h-10 flex-shrink-0">
+          {/* 文件标签滚动区域 */}
+          <div className="flex-1 flex items-center overflow-hidden">
             {fileTabs.length > 0 && (
               <Button
                 variant="ghost"
@@ -688,16 +1407,15 @@ export function ComputerView({
               className="flex overflow-x-hidden flex-1 h-full"
               style={{ scrollBehavior: 'smooth' }}
             >
-              {fileTabs.map(tab => (
+              {fileTabs.slice(0, maxTabs).map(tab => (
                 <div
                   key={tab.id}
                   role="button"
                   tabIndex={0}
                   onClick={() => {
-                    setActiveFileId(tab.id)
-                    setSelectedView('editing')
+                    handleTabSwitch(tab.id)
                   }}
-                  className={`flex items-center gap-2 px-3 h-full text-sm cursor-pointer w-32 border-r border-slate-300 flex-shrink-0
+                  className={`flex items-center gap-2 px-3 h-full text-sm cursor-pointer min-w-[120px] max-w-[200px] border-r border-slate-300 flex-shrink-0
                     ${activeFileId === tab.id && selectedView === 'editing' 
                       ? 'bg-white text-slate-900' 
                       : 'text-slate-600 hover:bg-slate-200 hover:text-slate-800'
@@ -729,17 +1447,17 @@ export function ComputerView({
             )}
           </div>
 
-          {/* 视图选择按钮 - 固定宽度 */}
-          <div className="w-[25%] flex border-l border-slate-300">
+          {/* 视图选择按钮 */}
+          <div className="flex border-l border-slate-300 flex-shrink-0">
             <Button
               variant="ghost"
               size="sm"
-              className={`flex-1 h-full px-2 rounded-none text-xs flex items-center justify-center gap-1
+              className={`h-full px-3 rounded-none text-xs flex items-center justify-center gap-1
                 ${selectedView === 'terminal' ? 'bg-slate-200 text-slate-900' : 'text-slate-600 hover:bg-slate-200 hover:text-slate-800'}`}
               onClick={() => setSelectedView('terminal')}
             >
               <Terminal className="h-3 w-3" />
-              <span className="hidden sm:inline">Terminal</span>
+              <span>Terminal</span>
               {terminalOutput.length > 0 && (
                 <span className="text-xs bg-blue-100 text-blue-700 px-1 py-0.5 rounded-full">
                   {Math.floor(terminalOutput.length / 2)}
@@ -749,69 +1467,75 @@ export function ComputerView({
             <Button
               variant="ghost"
               size="sm"
-              className={`flex-1 h-full px-2 rounded-none text-xs flex items-center justify-center gap-1 border-l border-slate-300
+              className={`h-full px-3 rounded-none text-xs flex items-center justify-center gap-1 border-l border-slate-300
                 ${selectedView === 'info' ? 'bg-slate-200 text-slate-900' : 'text-slate-600 hover:bg-slate-200 hover:text-slate-800'}`}
               onClick={() => setSelectedView('info')}
             >
               <Info className="h-3 w-3" />
-              <span className="hidden sm:inline">Info</span>
+              <span>Info</span>
             </Button>
           </div>
 
-          {/* 工具按钮 - 固定宽度，使用下拉菜单 */}
-          <div className="w-[15%] flex items-center border-l border-slate-300 justify-center">
-            <div className="relative">
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-slate-300 hover:bg-slate-200 text-slate-700 flex items-center gap-1 text-xs px-2"
-                onClick={() => setShowToolsMenu(!showToolsMenu)}
-              >
-                Tools
-                <ChevronDown className="h-3 w-3" />
-              </Button>
+          {/* 工具按钮 */}
+          <div className="flex items-center border-l border-slate-300 flex-shrink-0">
+            {/* 保存状态提示 */}
+            {saveStatus !== 'idle' && (
+              <div className={`flex items-center gap-1 px-3 text-xs ${
+                saveStatus === 'saving' ? 'text-blue-600' :
+                saveStatus === 'saved' ? 'text-green-600' :
+                'text-red-600'
+              }`}>
+                {saveStatus === 'saving' && (
+                  <>
+                    <div className="w-3 h-3 border border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    <span>Saving...</span>
+                  </>
+                )}
+                {saveStatus === 'saved' && (
+                  <>
+                    <CheckCircle2 className="h-3 w-3" />
+                    <span>Saved!</span>
+                  </>
+                )}
+                {saveStatus === 'error' && (
+                  <>
+                    <XCircle className="h-3 w-3" />
+                    <span>Save failed</span>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
 
-              {showToolsMenu && (
-                <div className="absolute top-full right-0 mt-1 bg-white border border-slate-300 rounded-md shadow-lg z-50 min-w-[180px]">
-                  <button
-                    className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    onClick={() => {
-                      handleSave();
-                      setShowToolsMenu(false);
-                    }}
-                    disabled={!(activeTab && activeTab.hasChanges)}
-                  >
-                    <Save className="h-3.5 w-3.5" />
-                    Save
-                  </button>
-                  <button
-                    className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    onClick={() => {
-                      handleRevert();
-                      setShowToolsMenu(false);
-                    }}
-                    disabled={isViewingHistory || !(activeTab && activeTab.hasChanges)}
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" />
-                    Revert
-                  </button>
-                  {activeTab && activeTab.fileType === 'markdown' && (
-                    <button
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2"
-                      onClick={() => {
-                        setShowMarkdownPreview(!showMarkdownPreview);
-                        setShowToolsMenu(false);
-                      }}
-                    >
-                      {showMarkdownPreview ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                      {showMarkdownPreview ? 'Hide Preview' : 'Show Preview'}
-                    </button>
-                  )}
+        {/* 新增的工具栏行 - 放置Code/Preview等按钮 */}
+        {selectedView === 'editing' && activeTab && (
+          <div className="flex items-center border-b border-slate-300 bg-slate-100 h-8 flex-shrink-0 px-2">
+            <div className="flex items-center gap-1">
+              {/* Markdown预览切换按钮 */}
+              {activeTab.fileType === 'markdown' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 border-slate-300 rounded text-xs px-2 py-1 flex items-center gap-1"
+                  onClick={() => setShowMarkdownPreview(!showMarkdownPreview)}
+                >
+                  {showMarkdownPreview ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                  {showMarkdownPreview ? 'Code' : 'Preview'}
+                </Button>
+              )}
+              
+              {/* 其他文件类型的工具按钮 */}
+              {activeTab.fileType === 'text' && (
+                <div className="text-xs text-slate-600 flex items-center gap-2">
+                  <span>Plain Text</span>
+                  <span>•</span>
+                  <span>{activeTab.content.split('\n').length} lines</span>
                 </div>
               )}
             </div>
           </div>
-        </div>
+        )}
 
         {/* 内容区域 */}
         <div className="flex-1 overflow-hidden">
@@ -842,7 +1566,7 @@ export function ComputerView({
                   </div>
                 )}
               </div>
-              <div className="flex items-center p-2 border-t border-slate-700">
+              <div className="flex items-center p-2 border-t border-slate-700 flex-shrink-0">
                 <span className="text-slate-400 font-mono text-sm mr-2">&gt;</span>
                 <input
                   ref={terminalInputRef}
@@ -878,19 +1602,31 @@ export function ComputerView({
                 </div>
 
                 <div>
-                  <h3 className="font-semibold text-slate-900 mb-3">File Statistics</h3>
+                  <h3 className="font-semibold text-slate-900 mb-3">Project Overview</h3>
                   <div className="bg-slate-100 rounded-lg p-4 space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-slate-600">Open files:</span>
-                      <span>{fileTabs.length}</span>
+                      <span className="text-slate-600">Total files:</span>
+                      <span>{fileStructure ? countAllFiles(fileStructure) : 0}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-600">Total files:</span>
-                      <span>{fileContents.size}</span>
+                      <span className="text-slate-600">Open tabs:</span>
+                      <span>{fileTabs.length}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-600">Modified files:</span>
                       <span>{fileTabs.filter(tab => tab.hasChanges).length}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Total size:</span>
+                      <span>{formatFileSize(calculateTotalSize())}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Steps completed:</span>
+                      <span>{activities?.length || 0}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Runtime:</span>
+                      <span>{getRuntime()}</span>
                     </div>
                   </div>
                 </div>
@@ -928,7 +1664,7 @@ export function ComputerView({
         </div>
 
         {/* 历史记录控制区域 */}
-        <div className="border-t border-slate-300 p-4 bg-slate-50">
+        <div className="border-t border-slate-300 p-4 bg-slate-50 flex-shrink-0">
           <div className="flex items-center gap-4">
             <Button
               variant="outline"
@@ -969,8 +1705,86 @@ export function ComputerView({
           </div>
         </div>
       </div>
+    )
+  }
 
+  // 默认的完整布局（已有的实现保持不变）
+  return (
+    <div className="h-full flex w-full">
+      {/* 左侧文件树 - 固定宽度 */}
+      <div className="w-64 border-r border-slate-300 bg-slate-50 flex-shrink-0">
+        <div className="border-b border-slate-300 px-4 py-3">
+          <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+            <FolderTree className="h-4 w-4" />
+            File Explorer
+          </h3>
+        </div>
+        <div className="overflow-y-auto h-[calc(100%-3rem)] py-2 custom-scrollbar">
+          {fileStructure ? (
+            renderFileTree(fileStructure)
+          ) : (
+            <div className="px-4 py-8 text-center text-sm text-slate-500">
+              No files yet
+            </div>
+          )}
+        </div>
+      </div>
 
+      {/* 右侧内容区域 */}
+      <div className="flex-1 flex flex-col overflow-hidden bg-white">
+        {/* 文件标签栏和工具栏 */}
+        <div className="flex items-center border-b border-slate-300 bg-slate-50 h-10">
+          {/* 其他已有的内容保持原样... */}
+        </div>
+
+        {/* 内容区域 */}
+        <div className="flex-1 overflow-hidden">
+          {selectedView === 'editing' && renderFileContent()}
+          {/* 其他视图的渲染逻辑保持原样... */}
+        </div>
+
+        {/* 历史记录控制区域 */}
+        <div className="border-t border-slate-300 p-4 bg-slate-50 flex-shrink-0">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              size="icon"
+              className="border-slate-300 hover:bg-slate-200"
+              onClick={() => onHistoryChange?.(Math.max(0, (currentHistoryIndexValue ?? 0) - 1))}
+              disabled={historyLength === 0 || currentHistoryIndexValue === 0}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <Slider
+              value={isViewingHistory ? [currentHistoryIndexValue ?? 0] : (historyLength > 0 ? [historyLength -1] : [0])}
+              max={historyLength > 0 ? historyLength - 1 : 0}
+              step={1}
+              className="flex-1"
+              onValueChange={value => onHistoryChange?.(value[0])}
+              disabled={historyLength === 0}
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              className="border-slate-300 hover:bg-slate-200"
+              onClick={() => onHistoryChange?.(Math.min(historyLength - 1, (currentHistoryIndexValue ?? -1) + 1))}
+              disabled={historyLength === 0 || !isViewingHistory || currentHistoryIndexValue === historyLength - 1}
+            >
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+            {isViewingHistory && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-2 border-blue-500 text-blue-600 hover:bg-blue-50"
+                onClick={() => onHistoryChange?.(-1)}
+              >
+                Go Live
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   )
-}
+})

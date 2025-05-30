@@ -51,6 +51,163 @@ SAMPLE_MEDIA = {
   <text x="320" y="230" text-anchor="middle" font-size="12" fill="#64748b">Q4</text>
 </svg>''',
         'description': 'A sample chart for data visualization demo'
+    },
+    'demo_page.html': {
+        'type': 'html',
+        'content': '''<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>演示页面 - Resear Pro</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            line-height: 1.6;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        h1 { 
+            color: #fff; 
+            text-align: center; 
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+        .feature-card {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 1.5rem;
+            border-radius: 15px;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+        .emoji { font-size: 3rem; margin-bottom: 1rem; }
+        button {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+        }
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .demo-section {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 1.5rem;
+            border-radius: 15px;
+            margin: 1.5rem 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Resear Pro 演示页面</h1>
+        
+        <div class="demo-section">
+            <h2>🎯 多媒体支持展示</h2>
+            <p>这是一个现代化的HTML演示页面，展示了Resear Pro的多媒体文件支持能力。</p>
+        </div>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="emoji">📄</div>
+                <h3>PDF 查看器</h3>
+                <p>支持直接在界面中查看PDF文档，无需外部软件。</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="emoji">🖼️</div>
+                <h3>图像显示</h3>
+                <p>支持多种图像格式的实时预览和显示。</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="emoji">🌐</div>
+                <h3>HTML 预览</h3>
+                <p>即时HTML页面渲染，支持代码和预览双模式。</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="emoji">📊</div>
+                <h3>数据可视化</h3>
+                <p>SVG图表和交互式数据展示功能。</p>
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h2>⚡ 交互功能测试</h2>
+            <button onclick="showAlert()">点击测试JavaScript</button>
+            <button onclick="changeColor()">改变背景色</button>
+            <button onclick="addTimestamp()">添加时间戳</button>
+            
+            <div id="output" style="margin-top: 1rem; padding: 1rem; background: rgba(0,0,0,0.2); border-radius: 10px;">
+                <p>交互输出区域：等待用户操作...</p>
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h2>📝 实时编辑测试</h2>
+            <p>您可以在代码模式下编辑此HTML文件，然后切换到预览模式查看效果。</p>
+            <p><strong>创建时间：</strong> <span id="timestamp"></span></p>
+        </div>
+    </div>
+
+    <script>
+        // 设置创建时间
+        document.getElementById('timestamp').textContent = new Date().toLocaleString();
+        
+        function showAlert() {
+            document.getElementById('output').innerHTML = 
+                '<p style="color: #4CAF50;">✅ JavaScript 功能正常运行！</p>';
+        }
+        
+        function changeColor() {
+            const colors = [
+                'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)'
+            ];
+            const randomColor = colors[Math.floor(Math.random() * colors.length)];
+            document.body.style.background = randomColor;
+            document.getElementById('output').innerHTML = 
+                '<p style="color: #FF9800;">🎨 背景颜色已更改！</p>';
+        }
+        
+        function addTimestamp() {
+            const now = new Date().toLocaleTimeString();
+            document.getElementById('output').innerHTML = 
+                `<p style="color: #2196F3;">⏰ 当前时间：${now}</p>`;
+        }
+    </script>
+</body>
+</html>''',
+        'description': 'Interactive HTML demonstration page with modern styling'
     }
 }
 
@@ -258,6 +415,44 @@ class TaskExecutor:
         """恢复任务执行"""
         self.is_paused = False
         logger.info(f"Task {self.task_id} resumed")
+
+    def emit_file_delete(self, filename: str):
+        """
+        发送文件删除事件
+
+        Args:
+            filename: 被删除的文件名
+        """
+        # 更新文件结构
+        self.update_file_structure()
+        
+        if self.task_id in task_queues:
+            task_queues[self.task_id].put({
+                "type": "file_delete",
+                "data": {
+                    "filename": filename
+                }
+            })
+
+    def emit_file_rename(self, old_name: str, new_name: str):
+        """
+        发送文件重命名事件
+
+        Args:
+            old_name: 原文件名
+            new_name: 新文件名
+        """
+        # 更新文件结构
+        self.update_file_structure()
+        
+        if self.task_id in task_queues:
+            task_queues[self.task_id].put({
+                "type": "file_rename",
+                "data": {
+                    "old_name": old_name,
+                    "new_name": new_name
+                }
+            })
 
     def wait_if_paused(self, step_duration: float = 1.0):
         """
@@ -895,6 +1090,296 @@ def pause_task(task_id):
         'status': status,
         'is_paused': executor.is_paused
     })
+
+
+@app.route('/api/tasks/<task_id>/save-file', methods=['POST'])
+def save_file_content(task_id):
+    """
+    保存文件内容到任务中
+    """
+    if task_id not in task_executors:
+        return jsonify({'error': 'Task not found'}), 404
+
+    try:
+        data = request.get_json()
+        if not data or 'filename' not in data or 'content' not in data:
+            return jsonify({'error': 'Missing filename or content'}), 400
+
+        filename = data['filename']
+        content = data['content']
+
+        executor = task_executors[task_id]
+        
+        # 更新文件内容
+        if filename in executor.all_files:
+            old_content = executor.all_files[filename]
+            executor.all_files[filename] = content
+            
+            # 发送文件更新事件
+            executor.emit_file_update(filename, content)
+            
+            # 记录文件编辑活动
+            edit_id = executor.emit_activity(
+                "edit", 
+                f"User modified file: {filename}",
+                filename=filename,
+                status="completed"
+            )
+            
+            logger.info(f"File saved: {filename} for task {task_id}")
+            
+            return jsonify({
+                'success': True,
+                'message': f'File {filename} saved successfully',
+                'filename': filename,
+                'size': len(content)
+            })
+        else:
+            return jsonify({'error': f'File {filename} not found in task'}), 404
+
+    except Exception as e:
+        logger.error(f"Error saving file for task {task_id}: {str(e)}")
+        return jsonify({'error': 'Failed to save file'}), 500
+
+
+@app.route('/api/tasks/<task_id>/create-file', methods=['POST'])
+def create_file(task_id):
+    """
+    创建新文件
+    """
+    if task_id not in task_executors:
+        return jsonify({'error': 'Task not found'}), 404
+
+    try:
+        data = request.get_json()
+        if not data or 'filename' not in data:
+            return jsonify({'error': 'Missing filename'}), 400
+
+        filename = data['filename']
+        content = data.get('content', '')  # 默认空内容
+        file_type = data.get('type', 'file')  # file 或 folder
+
+        executor = task_executors[task_id]
+        
+        # 检查文件是否已存在
+        if filename in executor.all_files:
+            return jsonify({'error': f'File {filename} already exists'}), 400
+
+        if file_type == 'file':
+            # 创建文件
+            executor.all_files[filename] = content
+            
+            # 更新文件结构
+            executor.update_file_structure()
+            
+            # 发送文件创建事件
+            executor.emit_file_update(filename, content)
+            
+            # 记录文件创建活动
+            create_id = executor.emit_activity(
+                "create", 
+                f"User created file: {filename}",
+                filename=filename,
+                status="completed"
+            )
+            
+            logger.info(f"File created: {filename} for task {task_id}")
+            
+            return jsonify({
+                'success': True,
+                'message': f'File {filename} created successfully',
+                'filename': filename,
+                'type': 'file',
+                'file_structure': executor.file_structure
+            })
+        else:
+            # 创建文件夹的逻辑（如果需要的话）
+            return jsonify({'error': 'Folder creation not implemented yet'}), 501
+
+    except Exception as e:
+        logger.error(f"Error creating file for task {task_id}: {str(e)}")
+        return jsonify({'error': 'Failed to create file'}), 500
+
+
+@app.route('/api/tasks/<task_id>/delete-file', methods=['DELETE'])
+def delete_file(task_id):
+    """
+    删除文件
+    """
+    if task_id not in task_executors:
+        return jsonify({'error': 'Task not found'}), 404
+
+    try:
+        data = request.get_json()
+        if not data or 'filename' not in data:
+            return jsonify({'error': 'Missing filename'}), 400
+
+        filename = data['filename']
+        executor = task_executors[task_id]
+        
+        # 检查文件是否存在
+        if filename not in executor.all_files:
+            return jsonify({'error': f'File {filename} not found'}), 404
+
+        # 删除文件
+        del executor.all_files[filename]
+        
+        # 更新文件结构
+        executor.update_file_structure()
+        
+        # 发送文件删除事件
+        executor.emit_file_delete(filename)
+        
+        # 记录文件删除活动
+        delete_id = executor.emit_activity(
+            "delete", 
+            f"User deleted file: {filename}",
+            filename=filename,
+            status="completed"
+        )
+        
+        logger.info(f"File deleted: {filename} for task {task_id}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'File {filename} deleted successfully',
+            'filename': filename,
+            'file_structure': executor.file_structure
+        })
+
+    except Exception as e:
+        logger.error(f"Error deleting file for task {task_id}: {str(e)}")
+        return jsonify({'error': 'Failed to delete file'}), 500
+
+
+@app.route('/api/tasks/<task_id>/rename-file', methods=['POST'])
+def rename_file(task_id):
+    """
+    重命名文件
+    """
+    if task_id not in task_executors:
+        return jsonify({'error': 'Task not found'}), 404
+
+    try:
+        data = request.get_json()
+        if not data or 'old_name' not in data or 'new_name' not in data:
+            return jsonify({'error': 'Missing old_name or new_name'}), 400
+
+        old_name = data['old_name']
+        new_name = data['new_name']
+        executor = task_executors[task_id]
+        
+        # 检查原文件是否存在
+        if old_name not in executor.all_files:
+            return jsonify({'error': f'File {old_name} not found'}), 404
+        
+        # 检查新文件名是否已存在
+        if new_name in executor.all_files:
+            return jsonify({'error': f'File {new_name} already exists'}), 400
+
+        # 重命名文件
+        content = executor.all_files[old_name]
+        del executor.all_files[old_name]
+        executor.all_files[new_name] = content
+        
+        # 更新文件结构
+        executor.update_file_structure()
+        
+        # 发送文件重命名事件
+        executor.emit_file_rename(old_name, new_name)
+        
+        # 记录文件重命名活动
+        rename_id = executor.emit_activity(
+            "rename", 
+            f"User renamed file: {old_name} → {new_name}",
+            filename=new_name,
+            status="completed"
+        )
+        
+        logger.info(f"File renamed: {old_name} → {new_name} for task {task_id}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'File renamed from {old_name} to {new_name}',
+            'old_name': old_name,
+            'new_name': new_name,
+            'file_structure': executor.file_structure
+        })
+
+    except Exception as e:
+        logger.error(f"Error renaming file for task {task_id}: {str(e)}")
+        return jsonify({'error': 'Failed to rename file'}), 500
+
+
+@app.route('/api/tasks/<task_id>/file-structure', methods=['GET'])
+def get_file_structure(task_id):
+    """
+    获取文件结构
+    """
+    if task_id not in task_executors:
+        return jsonify({'error': 'Task not found'}), 404
+
+    try:
+        executor = task_executors[task_id]
+        return jsonify({
+            'success': True,
+            'file_structure': executor.file_structure,
+            'files_count': len(executor.all_files)
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting file structure for task {task_id}: {str(e)}")
+        return jsonify({'error': 'Failed to get file structure'}), 500
+
+
+@app.route('/api/tasks/<task_id>/send-message', methods=['POST'])
+def send_user_message(task_id):
+    """
+    发送用户消息到任务中
+    """
+    if task_id not in task_executors:
+        return jsonify({'error': 'Task not found'}), 404
+
+    try:
+        data = request.get_json()
+        if not data or 'message' not in data:
+            return jsonify({'error': 'Missing message content'}), 400
+
+        message = data['message']
+        executor = task_executors[task_id]
+        
+        # 记录用户消息活动
+        message_id = executor.emit_activity(
+            "user_input",
+            message,
+            status="completed"
+        )
+        
+        # 模拟AI响应
+        if not executor.is_paused and executor.task_status == "started":
+            # 延迟发送AI响应
+            def send_ai_response():
+                time.sleep(1)
+                response_text = f"I understand your message: '{message}'. Let me help you with that."
+                executor.emit_activity(
+                    "response",
+                    response_text,
+                    status="completed"
+                )
+            
+            Thread(target=send_ai_response, daemon=True).start()
+        
+        logger.info(f"User message received for task {task_id}: {message}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Message sent successfully',
+            'message_id': message_id
+        })
+
+    except Exception as e:
+        logger.error(f"Error sending message for task {task_id}: {str(e)}")
+        return jsonify({'error': 'Failed to send message'}), 500
 
 
 @app.route('/api/tasks/<task_id>/export')
