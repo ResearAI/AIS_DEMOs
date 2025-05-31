@@ -24,6 +24,193 @@ active_tasks: Dict[str, Dict[str, Any]] = {}  # 活跃任务存储
 task_queues: Dict[str, queue.Queue] = {}  # 任务消息队列
 task_executors: Dict[str, 'TaskExecutor'] = {}  # 任务执行器实例
 
+# 示例多媒体内容 - 使用真实URL
+SAMPLE_MEDIA = {
+    'research_paper.pdf': {
+        'type': 'pdf',
+        'url': 'https://openreview.net/pdf?id=bjcsVLoHYs',
+        'description': 'A research paper on neural networks from OpenReview'
+    },
+    'brand_logo.png': {
+        'type': 'image',
+        'url': 'https://bianxieai.com/wp-content/uploads/2024/05/bianxieai.png',
+        'description': 'Brand logo image for demonstration'
+    },
+    'demo_chart.svg': {
+        'type': 'image',
+        'content': '''<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
+  <rect width="100%" height="100%" fill="#f8fafc"/>
+  <rect x="50" y="50" width="60" height="150" fill="#3b82f6"/>
+  <rect x="130" y="80" width="60" height="120" fill="#06d6a0"/>
+  <rect x="210" y="100" width="60" height="100" fill="#f72585"/>
+  <rect x="290" y="70" width="60" height="130" fill="#ffd60a"/>
+  <text x="200" y="30" text-anchor="middle" font-family="Arial" font-size="16" fill="#1e293b">Sample Chart Data</text>
+  <text x="80" y="230" text-anchor="middle" font-size="12" fill="#64748b">Q1</text>
+  <text x="160" y="230" text-anchor="middle" font-size="12" fill="#64748b">Q2</text>
+  <text x="240" y="230" text-anchor="middle" font-size="12" fill="#64748b">Q3</text>
+  <text x="320" y="230" text-anchor="middle" font-size="12" fill="#64748b">Q4</text>
+</svg>''',
+        'description': 'A sample chart for data visualization demo'
+    },
+    'demo_page.html': {
+        'type': 'html',
+        'content': '''<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>演示页面 - Resear Pro</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            line-height: 1.6;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        h1 { 
+            color: #fff; 
+            text-align: center; 
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+        .feature-card {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 1.5rem;
+            border-radius: 15px;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+        .emoji { font-size: 3rem; margin-bottom: 1rem; }
+        button {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+        }
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .demo-section {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 1.5rem;
+            border-radius: 15px;
+            margin: 1.5rem 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Resear Pro 演示页面</h1>
+        
+        <div class="demo-section">
+            <h2>🎯 多媒体支持展示</h2>
+            <p>这是一个现代化的HTML演示页面，展示了Resear Pro的多媒体文件支持能力。</p>
+        </div>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="emoji">📄</div>
+                <h3>PDF 查看器</h3>
+                <p>支持直接在界面中查看PDF文档，无需外部软件。</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="emoji">🖼️</div>
+                <h3>图像显示</h3>
+                <p>支持多种图像格式的实时预览和显示。</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="emoji">🌐</div>
+                <h3>HTML 预览</h3>
+                <p>即时HTML页面渲染，支持代码和预览双模式。</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="emoji">📊</div>
+                <h3>数据可视化</h3>
+                <p>SVG图表和交互式数据展示功能。</p>
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h2>⚡ 交互功能测试</h2>
+            <button onclick="showAlert()">点击测试JavaScript</button>
+            <button onclick="changeColor()">改变背景色</button>
+            <button onclick="addTimestamp()">添加时间戳</button>
+            
+            <div id="output" style="margin-top: 1rem; padding: 1rem; background: rgba(0,0,0,0.2); border-radius: 10px;">
+                <p>交互输出区域：等待用户操作...</p>
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h2>📝 实时编辑测试</h2>
+            <p>您可以在代码模式下编辑此HTML文件，然后切换到预览模式查看效果。</p>
+            <p><strong>创建时间：</strong> <span id="timestamp"></span></p>
+        </div>
+    </div>
+
+    <script>
+        // 设置创建时间
+        document.getElementById('timestamp').textContent = new Date().toLocaleString();
+        
+        function showAlert() {
+            document.getElementById('output').innerHTML = 
+                '<p style="color: #4CAF50;">✅ JavaScript 功能正常运行！</p>';
+        }
+        
+        function changeColor() {
+            const colors = [
+                'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)'
+            ];
+            const randomColor = colors[Math.floor(Math.random() * colors.length)];
+            document.body.style.background = randomColor;
+            document.getElementById('output').innerHTML = 
+                '<p style="color: #FF9800;">🎨 背景颜色已更改！</p>';
+        }
+        
+        function addTimestamp() {
+            const now = new Date().toLocaleTimeString();
+            document.getElementById('output').innerHTML = 
+                `<p style="color: #2196F3;">⏰ 当前时间：${now}</p>`;
+        }
+    </script>
+</body>
+</html>''',
+        'description': 'Interactive HTML demonstration page with modern styling'
+    }
+}
+
 
 class TaskExecutor:
     """
@@ -46,7 +233,15 @@ class TaskExecutor:
         self.is_paused = False
         self.all_files = {}  # 存储所有创建的文件
         self.execution_log = []  # 执行日志
-        self.file_structure = {}  # 文件结构
+        self.file_structure = {
+            "name": "/",  # 改为根目录
+            "type": "directory", 
+            "children": []
+        }
+        self.task_status = "created"  # 添加任务状态追踪
+        self.step_interval = 3.0  # 每步间隔3秒
+        self.messages_sent = 0  # 消息序号计数器
+        self.is_running = False  # 运行状态标志
 
     def emit_activity(self, activity_type: str, text: str, **kwargs) -> int:
         """
@@ -68,7 +263,7 @@ class TaskExecutor:
             "status": kwargs.get("status", "in-progress"),
             "timestamp": time.time()
         }
-
+        
         # 根据活动类型添加特定数据
         if activity_type == "command":
             activity["command"] = kwargs.get("command", "")
@@ -79,16 +274,13 @@ class TaskExecutor:
         elif activity_type == "terminal":
             activity["output"] = kwargs.get("output", "")
             activity["command"] = kwargs.get("command", "")
-
+        
+        logger.info(f"Task {self.task_id} - Activity: {activity}")
         # 记录到执行日志
         self.execution_log.append(activity)
 
         # 发送到前端
-        if self.task_id in task_queues:
-            task_queues[self.task_id].put({
-                "type": "activity",
-                "data": activity
-            })
+        self._send_message("activity", activity)
 
         return activity_id
 
@@ -101,42 +293,60 @@ class TaskExecutor:
             status: 新状态 (completed, failed, in-progress)
             **kwargs: 其他更新参数
         """
+        update_data = {
+            "id": activity_id,
+            "status": status,
+            **kwargs
+        }
+        self._send_message("activity_update", update_data)
+
+    def _send_message(self, msg_type: str, data: dict):
+        """
+        发送消息到队列的统一方法
+        
+        Args:
+            msg_type: 消息类型
+            data: 消息数据
+        """
         if self.task_id in task_queues:
-            task_queues[self.task_id].put({
-                "type": "activity_update",
-                "data": {
-                    "id": activity_id,
-                    "status": status,
-                    **kwargs
-                }
-            })
+            message = {
+                "type": msg_type,
+                "data": data,
+                "sequence": self.messages_sent
+            }
+            task_queues[self.task_id].put(message)
+            self.messages_sent += 1
+            logger.info(f"消息已发送: {msg_type}, 序号: {self.messages_sent}, 任务: {self.task_id}")
 
     def emit_file_update(self, filename: str, content: str):
         """
-        发送文件内容更新
-
-        Args:
-            filename: 文件名
-            content: 文件内容
+        发送文件内容更新 - 使用扁平化目录结构
         """
-        # 保存文件到内存
+        # 保存文件到内存 - 直接使用文件名，不添加目录前缀
         self.all_files[filename] = content
+        
+        # 先更新文件结构
         self.update_file_structure()
 
-        if self.task_id in task_queues:
-            task_queues[self.task_id].put({
-                "type": "file_update",
-                "data": {
-                    "filename": filename,
-                    "content": content
-                }
-            })
+        # 1. 先发送文件结构更新
+        self._send_message("file_structure_update", self.file_structure)
+        
+        # 2. 然后发送文件内容更新 - 直接使用文件名
+        file_data = {
+            "filename": filename,  # 不添加目录前缀
+            "content": content
+        }
+        self._send_message("file_update", file_data)
+        
+        # 3. 设置当前活动文件
+        self.current_file = filename
+        self.file_content = content
+
 
     def update_file_structure(self):
-        """更新文件结构并发送到前端"""
-        # 构建文件结构
+        """更新文件结构 - 扁平化根目录结构"""
         structure = {
-            "name": "resear-pro-task",
+            "name": "/",  # 根目录
             "type": "directory",
             "children": []
         }
@@ -146,11 +356,13 @@ class TaskExecutor:
         for filename in self.all_files.keys():
             parts = filename.split('/')
             if len(parts) > 1:
+                # 有子目录的文件
                 folder = parts[0]
                 if folder not in folders:
                     folders[folder] = []
                 folders[folder].append('/'.join(parts[1:]))
             else:
+                # 直接在根目录的文件
                 structure["children"].append({
                     "name": filename,
                     "type": "file",
@@ -175,13 +387,6 @@ class TaskExecutor:
 
         self.file_structure = structure
 
-        # 发送文件结构更新
-        if self.task_id in task_queues:
-            task_queues[self.task_id].put({
-                "type": "file_structure_update",
-                "data": structure
-            })
-
     def emit_terminal_output(self, command: str, output: str, status: str = "completed"):
         """
         发送终端输出
@@ -191,16 +396,13 @@ class TaskExecutor:
             output: 命令输出结果
             status: 执行状态
         """
-        if self.task_id in task_queues:
-            task_queues[self.task_id].put({
-                "type": "terminal",
-                "data": {
-                    "command": command,
-                    "output": output,
-                    "status": status,
-                    "timestamp": time.time()
-                }
-            })
+        terminal_data = {
+            "command": command,
+            "output": output,
+            "status": status,
+            "timestamp": time.time()
+        }
+        self._send_message("terminal", terminal_data)
 
     def emit_task_update(self, status: str, **kwargs):
         """
@@ -210,14 +412,14 @@ class TaskExecutor:
             status: 任务状态 (started, completed, failed, paused)
             **kwargs: 其他状态信息
         """
-        if self.task_id in task_queues:
-            task_queues[self.task_id].put({
-                "type": "task_update",
-                "data": {
-                    "status": status,
-                    **kwargs
-                }
-            })
+        # 更新内部状态
+        self.task_status = status
+        
+        task_data = {
+            "status": status,
+            **kwargs
+        }
+        self._send_message("task_update", task_data)
 
     def pause_task(self):
         """暂停任务执行"""
@@ -229,442 +431,348 @@ class TaskExecutor:
         self.is_paused = False
         logger.info(f"Task {self.task_id} resumed")
 
-    def wait_if_paused(self, step_duration: float = 1.0):
+    def wait_if_paused(self, duration: float = None):
         """
         检查暂停状态，如果暂停则等待
 
         Args:
-            step_duration: 步骤正常执行时间
+            duration: 等待时长，默认使用step_interval
         """
+        if duration is None:
+            duration = self.step_interval
+            
         if self.is_paused:
             while self.is_paused:
                 time.sleep(0.5)  # 暂停期间每0.5秒检查一次
         else:
-            time.sleep(step_duration)
+            time.sleep(duration)
+
+    def execute_step(self, step_num: int, activity_type: str, text: str, **kwargs):
+        """
+        执行单个步骤的通用方法
+        
+        Args:
+            step_num: 步骤号
+            activity_type: 活动类型
+            text: 步骤描述
+            **kwargs: 其他参数
+        """
+        logger.info(f"Task {self.task_id} - Step {step_num}: {text}")
+        
+        # 发送活动开始
+        activity_id = self.emit_activity(activity_type, f"Step {step_num}: {text}", 
+                                       status="in-progress", **kwargs)
+        
+        # 等待（检查暂停状态）
+        self.wait_if_paused()
+        logger.info(f"SUCCESS Task {self.task_id} - Step {step_num}: {text}")
+        # 标记完成
+        self.update_activity_status(activity_id, "completed")
+        
+        return activity_id
 
     def execute_task(self):
         """
-        执行任务的主要逻辑
-        模拟完整的AI助手工作流程
+        重构后的任务执行流程 - 简化为10个主要步骤，每步3秒间隔
         """
+        self.is_running = True
         try:
-            # 1. 任务开始
+            # 任务开始
             self.emit_task_update("started")
-            thinking_id = self.emit_activity("thinking", "Analyzing task requirements...", status="in-progress")
-            self.wait_if_paused(2)
-            self.update_activity_status(thinking_id, "completed")
+            
+            # 步骤1：任务分析和初始化
+            self.execute_step(1, "thinking", "分析任务需求并初始化多媒体工作环境")
+            
+            # 步骤2：创建工作目录
+            command = "mkdir -p workspace/media && cd workspace"
+            activity_id = self.execute_step(2, "command", "创建多媒体工作空间", command=command)
+            self.emit_terminal_output(command, 
+                "✅ 工作目录创建成功\n📁 多媒体工作空间已初始化\n🎯 准备支持PDF、图片和交互内容")
 
-            # 2. 创建工作环境
-            cmd_id = self.emit_activity("command", "Creating workspace and environment setup", status="in-progress")
-            command = "mkdir -p workspace && cd workspace"
-            self.wait_if_paused(1)
-            self.emit_terminal_output(command, "Directory created successfully\nChanged to workspace directory")
-            self.update_activity_status(cmd_id, "completed", command=command)
+            # 步骤3：创建任务清单文件
+            todo_content = f"""# Task: {self.prompt}
 
-            # 3. 创建任务清单文件 (todo.md)
-            initial_todo = f"""# Task: {self.prompt}
+## 📋 任务进度
+- [x] 分析用户需求
+- [x] 设置多媒体工作空间
+- [ ] 创建实时多媒体演示
+- [ ] 生成PDF和图像内容
+- [ ] 创建交互示例
+- [ ] 测试多媒体支持
+- [ ] 完成任务
 
-## Task Analysis
-- [x] Understand user requirements
-- [ ] Develop execution plan
-- [ ] Create project files
-- [ ] Implement core functionality
-- [ ] Test and verify
-- [ ] Complete task
+## 🎯 多媒体演示功能
+- 📸 真实图像显示 (brand_logo.png)
+- 📄 实时PDF查看 (research_paper.pdf) 
+- 📊 交互式图表和图形
+- 🎨 SVG图形和数据可视化
 
-## Execution Log
-Start time: {time.strftime('%Y-%m-%d %H:%M:%S')}
-Status: In progress
+## 🌐 实时演示源
+- PDF: https://openreview.net/pdf?id=bjcsVLoHYs
+- 图像: https://bianxieai.com/wp-content/uploads/2024/05/bianxieai.png
 
-## File List
-- todo.md (Task checklist)
-- config.json (Configuration file)
-- main.py (Main program file)
+## 📊 执行记录
+开始时间: {time.strftime('%Y-%m-%d %H:%M:%S')}
+状态: 🟡 进行中
 """
+            self.execute_step(3, "file", "创建任务清单文件", filename="todo.md")
+            self.emit_file_update("todo.md", todo_content)
+            self.file_content = todo_content
 
-            self.current_file = "todo.md"
-            self.file_content = initial_todo
-
-            file_id = self.emit_activity("file", "Creating task checklist file", filename="todo.md", status="in-progress")
-            self.wait_if_paused(1)
-            self.emit_file_update("todo.md", initial_todo)
-            self.update_activity_status(file_id, "completed")
-
-            # 4. 创建配置文件 (config.json)
+            # 步骤4：创建配置文件
             config_content = json.dumps({
                 "project": {
-                    "name": "Resear Pro Task",
-                    "version": "1.0.0",
-                    "description": "AI research assistant task execution",
+                    "name": "Resear Pro Task - 真实多媒体版",
+                    "version": "2.0.0",
+                    "description": "AI研究助手与真实多媒体支持",
                     "created": time.strftime('%Y-%m-%d %H:%M:%S')
                 },
-                "settings": {
-                    "debug": True,
-                    "auto_save": True,
-                    "max_retries": 3,
-                    "features": ["streaming", "real-time", "multi-file"]
-                },
-                "execution": {
-                    "max_steps": 10,
-                    "timeout": 300,
-                    "retry_count": 3,
-                    "parallel_processing": False
+                "multimedia": {
+                    "real_urls": True,
+                    "pdf_source": "https://openreview.net/pdf?id=bjcsVLoHYs",
+                    "image_source": "https://bianxieai.com/wp-content/uploads/2024/05/bianxieai.png",
+                    "preview_enabled": True
                 },
                 "task": {
                     "description": self.prompt,
                     "priority": "normal",
-                    "estimated_duration": "5-10 minutes"
+                    "multimedia_demo": True
                 }
             }, indent=2, ensure_ascii=False)
-
-            config_id = self.emit_activity("file", "Creating project configuration file", filename="config.json", status="in-progress")
-            self.wait_if_paused(1)
+            
+            self.execute_step(4, "file", "创建项目配置文件", filename="config.json")
             self.emit_file_update("config.json", config_content)
-            cmd = "touch config.json && echo 'Configuration file created'"
-            self.emit_terminal_output(cmd, "Configuration file created")
-            self.update_activity_status(config_id, "completed")
 
-            # 5. 创建主程序文件 (main.py)
-            python_content = f'''#!/usr/bin/env python3
-"""
-Resear Pro - AI Task Executor
-Generated at: {time.strftime('%Y-%m-%d %H:%M:%S')}
-Task description: {self.prompt}
-"""
-
-import json
-import time
-import logging
-from datetime import datetime
-from typing import Dict, List, Any
-
-# 配置日志
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-class TaskExecutor:
-    """Task executor class"""
-
-    def __init__(self, config_file: str = "config.json"):
-        """
-        Initialize task executor
-
-        Args:
-            config_file: Configuration file path
-        """
-        self.load_config(config_file)
-        self.start_time = datetime.now()
-        self.completed_steps = 0
-
-    def load_config(self, config_file: str):
-        """Load configuration file"""
-        try:
-            with open(config_file, 'r', encoding='utf-8') as f:
-                self.config = json.load(f)
-            logger.info("Configuration file loaded successfully")
-        except Exception as e:
-            logger.error(f"Failed to load configuration file: {{e}}")
-            self.config = {{"project": {{"name": "Default Task"}}}}
-
-    def log_progress(self, message: str, step: int = None):
-        """Log progress message"""
-        timestamp = datetime.now().strftime('%H:%M:%S')
-        if step:
-            print(f"[{{timestamp}}] Step {{step}}: {{message}}")
-        else:
-            print(f"[{{timestamp}}] {{message}}")
-
-    def execute_step(self, step_name: str, duration: float = 1.0) -> bool:
-        """
-        Execute a single step
-
-        Args:
-            step_name: Step name
-            duration: Simulated execution time
-
-        Returns:
-            Whether execution was successful
-        """
-        self.log_progress(f"Starting: {{step_name}}")
-
-        try:
-            # Simulate step execution
-            time.sleep(duration)
-            self.completed_steps += 1
-            self.log_progress(f"Completed: {{step_name}}")
-            return True
-        except Exception as e:
-            self.log_progress(f"Failed: {{step_name}} - {{e}}")
-            return False
-
-    def execute(self) -> bool:
-        """
-        Execute main task logic
-
-        Returns:
-            Whether the task was successfully completed
-        """
-        self.log_progress("=== Resear Pro Task Executor Started ===")
-        self.log_progress(f"Task description: {self.prompt}")
-        self.log_progress(f"Project name: {{self.config['project']['name']}}")
-
-        # Define execution steps
-        steps = [
-            ("Environment initialization", 1.0),
-            ("Configuration validation", 0.5),
-            ("Dependency check", 1.0),
-            ("Core logic execution", 2.0),
-            ("Result verification", 1.0),
-            ("Cleanup and optimization", 0.5)
-        ]
-
-        success_count = 0
-
-        for i, (step_name, duration) in enumerate(steps, 1):
-            self.log_progress(f"Executing step {{i}}/{{len(steps)}}: {{step_name}}")
-
-            if self.execute_step(step_name, duration):
-                success_count += 1
-            else:
-                self.log_progress(f"Step failed, but continuing execution...")
-
-        # Generate execution report
-        execution_time = (datetime.now() - self.start_time).total_seconds()
-        success_rate = (success_count / len(steps)) * 100
-
-        self.log_progress("=== Execution completed ===")
-        self.log_progress(f"Total steps: {{len(steps)}}")
-        self.log_progress(f"Successful steps: {{success_count}}")
-        self.log_progress(f"Success rate: {{success_rate:.1f}}%")
-        self.log_progress(f"Execution time: {{execution_time:.1f}}s")
-
-        return success_rate >= 80  # 80% or higher success rate is considered successful
-
-def main():
-    """Main function"""
-    print("Starting Resear Pro Task Executor...")
-
-    executor = TaskExecutor()
-    success = executor.execute()
-
-    if success:
-        print("\\n🎉 Task executed successfully!")
-        exit(0)
-    else:
-        print("\\n❌ Task execution failed")
-        exit(1)
-
-if __name__ == "__main__":
-    main()
-'''
-
-            py_id = self.emit_activity("file", "Creating main program file", filename="main.py", status="in-progress")
-            self.wait_if_paused(1)
-            self.emit_file_update("main.py", python_content)
-            cmd = "touch main.py && chmod +x main.py"
-            self.emit_terminal_output(cmd, "Python script created and made executable")
-            self.update_activity_status(py_id, "completed")
-
-            # 6. 执行主要任务步骤
-            steps = [
-                ("thinking", "Developing detailed execution plan", 2),
-                ("command", "Installing project dependencies", "pip install -r requirements.txt"),
-                ("edit", "Updating task progress", "todo.md"),
-                ("command", "Running code analysis", "python -m flake8 main.py"),
-                ("browse", "Viewing project documentation", "file:///docs/project-guide.md"),
-                ("command", "Executing main program", "python main.py"),
-                ("thinking", "Verifying execution results", 2),
-                ("edit", "Updating final status", "todo.md"),
-            ]
-
-            for i, (step_type, step_text, *args) in enumerate(steps, 1):
-                step_id = self.emit_activity(step_type, f"Step {i}: {step_text}", status="in-progress")
-
-                if step_type == "thinking":
-                    self.wait_if_paused(args[0] if args else 2)
+            # 步骤5：创建多媒体文件
+            self.execute_step(5, "thinking", "下载并准备真实多媒体文件")
+            
+            # 创建多媒体文件
+            for filename, media_info in SAMPLE_MEDIA.items():
+                if 'url' in media_info:
+                    content = media_info['url']
+                elif 'content' in media_info:
+                    content = media_info['content']
                 else:
-                    self.wait_if_paused(1)
+                    content = f'Content for {filename}'
+                self.emit_file_update(filename, content)
 
-                if step_type == "command":
-                    command = args[0] if args else ""
-                    # 生成不同命令的模拟输出
-                    if "pip install" in command:
-                        output = """Collecting packages...
-Looking in indexes: https://pypi.org/simple/
-Collecting flask
-  Downloading Flask-2.3.3-py3-none-any.whl (96 kB)
-Collecting requests
-  Downloading requests-2.31.0-py3-none-any.whl (62 kB)
-Installing collected packages: flask, requests
-Successfully installed flask-2.3.3 requests-2.31.0"""
-                    elif "flake8" in command:
-                        output = """Checking Python code style...
-main.py:1:1: E302 expected 2 blank lines, found 1
-main.py:45:80: E501 line too long (85 > 79 characters)
-2 warnings found, but code quality is acceptable."""
-                    elif "python main.py" in command:
-                        output = f"""Starting Resear Pro Task Executor...
-=== Resear Pro Task Executor Started ===
-[{time.strftime('%H:%M:%S')}] Task description: {self.prompt}
-[{time.strftime('%H:%M:%S')}] Project name: Resear Pro Task
-[{time.strftime('%H:%M:%S')}] Executing step 1/6: Environment initialization
-[{time.strftime('%H:%M:%S')}] Step 1: Starting: Environment initialization
-[{time.strftime('%H:%M:%S')}] Step 1: Completed: Environment initialization
-[{time.strftime('%H:%M:%S')}] Executing step 2/6: Configuration validation
-[{time.strftime('%H:%M:%S')}] Step 2: Starting: Configuration validation
-[{time.strftime('%H:%M:%S')}] Step 2: Completed: Configuration validation
-[{time.strftime('%H:%M:%S')}] Executing step 3/6: Dependency check
-[{time.strftime('%H:%M:%S')}] Step 3: Starting: Dependency check
-[{time.strftime('%H:%M:%S')}] Step 3: Completed: Dependency check
-[{time.strftime('%H:%M:%S')}] Executing step 4/6: Core logic execution
-[{time.strftime('%H:%M:%S')}] Step 4: Starting: Core logic execution
-[{time.strftime('%H:%M:%S')}] Step 4: Completed: Core logic execution
-[{time.strftime('%H:%M:%S')}] Executing step 5/6: Result verification
-[{time.strftime('%H:%M:%S')}] Step 5: Starting: Result verification
-[{time.strftime('%H:%M:%S')}] Step 5: Completed: Result verification
-[{time.strftime('%H:%M:%S')}] Executing step 6/6: Cleanup and optimization
-[{time.strftime('%H:%M:%S')}] Step 6: Starting: Cleanup and optimization
-[{time.strftime('%H:%M:%S')}] Step 6: Completed: Cleanup and optimization
-=== Execution completed ===
-[{time.strftime('%H:%M:%S')}] Total steps: 6
-[{time.strftime('%H:%M:%S')}] Successful steps: 6
-[{time.strftime('%H:%M:%S')}] Success rate: 100.0%
-[{time.strftime('%H:%M:%S')}] Execution time: 6.1s
+            # 步骤6：验证多媒体链接
+            command = "curl -I https://openreview.net/pdf?id=bjcsVLoHYs"
+            self.execute_step(6, "command", "验证PDF文档可访问性", command=command)
+            self.emit_terminal_output(command, 
+                "HTTP/2 200 OK\ncontent-type: application/pdf\n✅ PDF文档可访问且准备就绪\n📄 研究论文加载成功")
 
-🎉 Task executed successfully!"""
-                    else:
-                        output = f"Command executed: {command}\\nOperation completed successfully."
+            # 步骤7：创建演示报告
+            demo_content = f"""# 🎯 真实多媒体演示报告
 
-                    self.emit_terminal_output(command, output)
-                    self.update_activity_status(step_id, "completed", command=command)
+## 任务概述
+**任务:** {self.prompt}  
+**创建时间:** {time.strftime('%Y-%m-%d %H:%M:%S')}  
+**状态:** ✅ 进行中
 
-                elif step_type == "edit":
-                    if "todo.md" in args[0]:
-                        if i <= 3:
-                            # 第一次更新
-                            updated_todo = self.file_content.replace(
-                                "- [ ] Develop execution plan", "- [x] Develop execution plan"
-                            ).replace(
-                                "- [ ] Create project files", "- [x] Create project files"
-                            )
-                        else:
-                            # 最终更新
-                            updated_todo = self.file_content.replace(
-                                "- [ ] Implement core functionality", "- [x] Implement core functionality"
-                            ).replace(
-                                "- [ ] Test and verify", "- [x] Test and verify"
-                            ).replace(
-                                "- [ ] Complete task", "- [x] Complete task"
-                            ).replace(
-                                "Status: In progress", f"Status: Completed\\nCompletion time: {time.strftime('%Y-%m-%d %H:%M:%S')}"
-                            )
+## 🎥 实时多媒体能力
 
-                        self.file_content = updated_todo
-                        self.emit_file_update("todo.md", updated_todo)
+### 📸 真实图像支持
+来自网络的实际图像显示：
+![品牌Logo](https://bianxieai.com/wp-content/uploads/2024/05/bianxieai.png)
 
-                    self.update_activity_status(step_id, "completed", filename=args[0] if args else "")
+### 📊 交互式数据可视化
+SVG实时图表渲染：
+![演示图表](demo_chart.svg)
 
-                elif step_type == "browse":
-                    self.update_activity_status(step_id, "completed", path=args[0] if args else "")
-                else:
-                    self.update_activity_status(step_id, "completed")
+### 📄 实时PDF文档查看
+带完整查看器功能的真实研究论文：
+[查看研究论文](https://openreview.net/pdf?id=bjcsVLoHYs)
 
-                self.wait_if_paused(0.5)
+## ✨ 功能展示
+- ✅ 网络URL实时图像加载
+- ✅ 实时PDF文档查看与导航
+- ✅ 交互式SVG图表渲染
+- ✅ 嵌入媒体的Markdown预览
 
-            # 7. 创建额外的文件来丰富文件结构
-            # 创建 requirements.txt
-            requirements_content = """Flask==2.3.3
-requests==2.31.0
-flake8==6.0.0
-pytest==7.4.0"""
-            req_id = self.emit_activity("file", "Creating dependencies file", filename="requirements.txt", status="in-progress")
-            self.wait_if_paused(0.5)
-            self.emit_file_update("requirements.txt", requirements_content)
-            self.update_activity_status(req_id, "completed")
-
-            # 创建 README.md
-            readme_content = f"""# Resear Pro Task
-
-## Task Description
-{self.prompt}
-
-## Project Structure
-```
-resear-pro-task/
-├── todo.md          # Task checklist
-├── config.json      # Project configuration
-├── main.py          # Main program
-├── requirements.txt # Python dependencies
-└── README.md        # Project documentation
-```
-
-## How to Run
-```bash
-pip install -r requirements.txt
-python main.py
-```
-
-## Generated at
-{time.strftime('%Y-%m-%d %H:%M:%S')}
+---
+*由Resear Pro AI助手生成 - 真实多媒体URL版* 🚀
 """
-            readme_id = self.emit_activity("file", "Creating project README file", filename="README.md", status="in-progress")
-            self.wait_if_paused(0.5)
-            self.emit_file_update("README.md", readme_content)
-            self.update_activity_status(readme_id, "completed")
+            self.execute_step(7, "file", "创建多媒体演示报告", filename="demo_report.md")
+            self.emit_file_update("demo_report.md", demo_content)
 
-            # 8. 任务完成
-            final_id = self.emit_activity("thinking", "Generating final report and completing task", status="in-progress")
-            self.wait_if_paused(1)
+            # 步骤8：运行多媒体集成测试
+            command = "python test_multimedia.py"
+            self.execute_step(8, "command", "运行多媒体集成测试", command=command)
+            self.emit_terminal_output(command, 
+                """🧪 测试真实多媒体集成...
+✅ PDF查看器: 成功加载OpenReview论文
+✅ 图像显示: 品牌logo正确渲染  
+✅ SVG图表: 交互式图形正常工作
+✅ Markdown预览: 媒体链接正确嵌入
 
+=== 多媒体测试结果 ===
+PDF加载: ✅ 通过 (2.3s)
+图像加载: ✅ 通过 (0.8s) 
+SVG渲染: ✅ 通过 (0.2s)
+URL验证: ✅ 通过
+
+🎉 所有真实多媒体功能完美运行！""")
+
+            # 步骤9：更新任务进度
+            updated_todo = self.file_content.replace(
+                "- [ ] 创建实时多媒体演示", "- [x] 创建实时多媒体演示"
+            ).replace(
+                "- [ ] 生成PDF和图像内容", "- [x] 生成PDF和图像内容"
+            ).replace(
+                "- [ ] 创建交互示例", "- [x] 创建交互示例"
+            ).replace(
+                "- [ ] 测试多媒体支持", "- [x] 测试多媒体支持"
+            ).replace(
+                "- [ ] 完成任务", "- [x] 完成任务"
+            ).replace(
+                "状态: 🟡 进行中", 
+                f"状态: ✅ 已完成\n完成时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+            
+            self.execute_step(9, "edit", "更新任务完成状态", filename="todo.md")
+            self.emit_file_update("todo.md", updated_todo)
+            self.file_content = updated_todo
+
+            # 步骤10：生成最终报告
+            self.execute_step(10, "thinking", "生成任务完成报告和总结")
+            
             # 发送最终总结
             self.emit_terminal_output(
-                "echo 'Task execution completed successfully'",
+                "echo '真实多媒体任务执行完成'",
                 f"""
-=== Resear Pro Task Execution Report ===
-Task ID: {self.task_id}
-Start time: {time.strftime('%Y-%m-%d %H:%M:%S')}
-Task description: {self.prompt}
-Created files: {len(self.all_files)} ({', '.join(self.all_files.keys())})
-Execution steps: {len(steps)}
-Execution log: {len(self.execution_log)} entries
-Status: ✅ Successfully completed
+🎊 === Resear Pro 真实多媒体任务执行报告 ===
 
-All files have been saved and execution log has been recorded.
-Task execution completed successfully
+📋 任务信息
+任务ID: {self.task_id[:8]}...
+任务描述: {self.prompt}
+完成时间: {time.strftime('%Y-%m-%d %H:%M:%S')}
+
+📊 统计数据
+创建文件: {len(self.all_files)} 个
+多媒体文件: {len(SAMPLE_MEDIA)} 个
+执行步骤: 10 步
+总耗时: 约30秒
+
+🌐 实时多媒体源
+📄 PDF: https://openreview.net/pdf?id=bjcsVLoHYs
+🖼️ 图像: https://bianxieai.com/wp-content/uploads/2024/05/bianxieai.png
+
+✅ 任务状态: 成功完成
+🎯 所有真实多媒体文件准备就绪，可在仪表板中查看！
 """
             )
 
-            self.update_activity_status(final_id, "completed")
+            # 任务完成
             self.emit_task_update("completed")
+            logger.info(f"Task {self.task_id} completed successfully")
 
         except Exception as e:
             logger.error(f"Task {self.task_id} failed: {str(e)}")
-            self.emit_activity("thinking", f"Task execution error: {str(e)}", status="error")
+            self.emit_activity("thinking", f"任务执行错误: {str(e)}", status="error")
             self.emit_task_update("failed", error=str(e))
+        finally:
+            self.is_running = False
+
+    def emit_file_delete(self, filename: str):
+        """发送文件删除事件"""
+        if filename in self.all_files:
+            del self.all_files[filename]
+        self.update_file_structure()
+        
+        self._send_message("file_delete", {"filename": filename})
+
+    def normalize_filename(self, filename: str) -> str:
+        """规范化文件名 - 确保在文件结构中的一致性"""
+        if not filename:
+            return filename
+            
+        # 如果文件名已经包含根目录，直接返回
+        if filename.startswith('resear-pro-task/'):
+            return filename
+            
+        # 如果是根目录本身
+        if filename == 'resear-pro-task':
+            return filename
+            
+        # 否则添加根目录前缀
+        return f"resear-pro-task/{filename}"
+
+    def emit_file_rename(self, old_name: str, new_name: str):
+        """发送文件重命名事件"""
+        if old_name in self.all_files:
+            content = self.all_files[old_name]
+            del self.all_files[old_name]
+            self.all_files[new_name] = content
+        
+        self.update_file_structure()
+        
+        rename_data = {
+            "old_name": old_name,
+            "new_name": new_name
+        }
+        self._send_message("file_rename", rename_data)
+
+    def create_folder(self, folder_name: str, parent_path: str = '/'):
+        """创建文件夹 - 支持在根目录或子目录创建"""
+        if parent_path == '/' or parent_path == '':
+            full_path = folder_name
+        else:
+            full_path = f"{parent_path}/{folder_name}"
+            
+        self.update_file_structure_for_folder(full_path)
+        
+        folder_data = {
+            "folder_name": full_path,
+            "parent_path": parent_path
+        }
+        self._send_message("folder_create", folder_data)
+
+    def update_file_structure_for_folder(self, folder_path: str):
+        """为文件夹更新文件结构 - 扁平化处理"""
+        # 简化的文件夹处理逻辑
+        path_parts = [part for part in folder_path.split('/') if part != '']
+        
+        current = self.file_structure
+        if not current.get("children"):
+            current["children"] = []
+        
+        # 递归创建文件夹结构
+        for i, part in enumerate(path_parts):
+            existing = None
+            for child in current["children"]:
+                if child["name"] == part and child["type"] == "directory":
+                    existing = child
+                    break
+            
+            if not existing:
+                new_folder = {
+                    "name": part,
+                    "type": "directory",
+                    "children": []
+                }
+                current["children"].append(new_folder)
+                current = new_folder
+            else:
+                current = existing
+        
+        self._send_message("file_structure_update", self.file_structure)
 
 
 def create_task_export_zip(task_executor: TaskExecutor) -> bytes:
-    """
-    创建任务导出ZIP文件
-
-    Args:
-        task_executor: 任务执行器实例
-
-    Returns:
-        ZIP文件的字节数据
-    """
+    """创建任务导出ZIP文件"""
     zip_buffer = io.BytesIO()
 
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-        # 1. 添加所有创建的文件
+        # 添加所有创建的文件
         for filename, content in task_executor.all_files.items():
             zip_file.writestr(f"files/{filename}", content)
 
-        # 2. 添加执行日志
+        # 添加执行日志
         log_content = json.dumps(task_executor.execution_log, indent=2, ensure_ascii=False)
         zip_file.writestr("execution_log.json", log_content)
 
-        # 3. 添加任务信息
+        # 添加任务信息
         task_info = {
             "task_id": task_executor.task_id,
             "prompt": task_executor.prompt,
@@ -672,34 +780,30 @@ def create_task_export_zip(task_executor: TaskExecutor) -> bytes:
             "total_files": len(task_executor.all_files),
             "total_activities": len(task_executor.execution_log),
             "file_list": list(task_executor.all_files.keys()),
-            "file_structure": task_executor.file_structure
+            "file_structure": task_executor.file_structure,
+            "multimedia_support": True,
+            "real_urls": True
         }
         zip_file.writestr("task_info.json", json.dumps(task_info, indent=2, ensure_ascii=False))
 
-        # 4. 添加README说明文件
-        readme_content = f"""# Resear Pro Task Export
+        # 添加README
+        readme_content = f"""# Resear Pro 真实多媒体任务导出
 
-## Task Information
-- Task ID: {task_executor.task_id}
-- Task Description: {task_executor.prompt}
-- Export Time: {time.strftime('%Y-%m-%d %H:%M:%S')}
+## 任务信息
+- 任务ID: {task_executor.task_id}
+- 任务描述: {task_executor.prompt}
+- 导出时间: {time.strftime('%Y-%m-%d %H:%M:%S')}
 
-## File Structure
-- `files/` - All files created during task execution
-- `execution_log.json` - Detailed execution log
-- `task_info.json` - Basic task information
-- `README.md` - This documentation file
+## 文件结构
+- `files/` - 任务执行期间创建的所有文件
+- `execution_log.json` - 详细执行日志
+- `task_info.json` - 任务信息和元数据
 
-## Created Files
+## 创建的文件
 {chr(10).join(f"- {filename}" for filename in task_executor.all_files.keys())}
 
-## Usage Instructions
-1. All created files are in the `files/` directory
-2. Check `execution_log.json` for detailed execution process
-3. These files can be used directly or edited further
-
 ---
-Generated by Resear Pro AI Assistant
+由Resear Pro AI助手生成 - 真实多媒体版 🚀
 """
         zip_file.writestr("README.md", readme_content)
 
@@ -711,11 +815,7 @@ Generated by Resear Pro AI Assistant
 
 @app.route('/api/tasks', methods=['POST'])
 def create_task():
-    """
-    创建新的AI任务
-
-    接收用户的任务描述，创建任务实例并开始异步执行
-    """
+    """创建新的AI任务"""
     data = request.get_json()
     prompt = data.get('prompt', '')
     attachments = data.get('attachments', [])
@@ -733,92 +833,100 @@ def create_task():
         'prompt': prompt,
         'attachments': attachments,
         'status': 'created',
-        'created_at': time.time()
+        'created_at': time.time(),
+        'multimedia_support': True,
+        'real_urls': True
     }
 
-    # 创建并启动任务执行器
+    # 创建任务执行器（但不立即启动）
     executor = TaskExecutor(task_id, prompt)
     task_executors[task_id] = executor
-
-    thread = Thread(target=executor.execute_task)
-    thread.daemon = True
-    thread.start()
 
     logger.info(f"Created task {task_id}: {prompt[:50]}...")
 
     return jsonify({
         'task_id': task_id,
-        'status': 'created'
+        'status': 'created',
+        'multimedia_support': True,
+        'real_urls': True
     })
 
 
-@app.route('/api/tasks/<task_id>/stream')
-def stream_task(task_id):
-    """
-    流式输出任务执行进度
-
-    使用Server-Sent Events (SSE) 实时推送任务执行状态
-    """
-
-    def generate():
-        if task_id not in task_queues:
-            yield f"data: {json.dumps({'error': 'Task not found'})}\n\n"
-            return
-
+@app.route('/api/tasks/<task_id>/connect', methods=['POST'])
+def connect_task(task_id):
+    """连接并开始执行任务（POST模式）"""
+    logger.info(f"Frontend connecting to task: {task_id}")
+    
+    if task_id not in task_executors:
+        return jsonify({'error': 'Task not found'}), 404
+    
+    def generate_chunked_response():
+        """生成分块响应"""
+        executor = task_executors[task_id]
         task_queue = task_queues[task_id]
-        logger.info(f"Started streaming for task {task_id}")
-
+        
+        # 启动任务执行（如果还没有启动）
+        if not executor.is_running:
+            logger.info(f"Starting task execution thread for {task_id}...")
+            thread = Thread(target=executor.execute_task)
+            thread.daemon = True
+            thread.start()
+        
+        message_count = 0
+        
         try:
             while True:
                 try:
-                    # 等待新消息，超时后检查任务状态
+                    # 等待消息，超时30秒
                     message = task_queue.get(timeout=30)
-                    yield f"data: {json.dumps(message)}\n\n"
-
-                    # 如果任务完成或失败，发送完成信号后优雅退出
-                    if (message.get('type') == 'task_update' and
-                            message.get('data', {}).get('status') in ['completed', 'failed']):
-                        # 发送最终状态消息
-                        final_status = message.get('data', {}).get('status')
-                        yield f"data: {json.dumps({'type': 'connection_close', 'reason': f'task_{final_status}'})}\n\n"
-                        logger.info(f"Task {task_id} {final_status}, closing stream")
+                    message_count += 1
+                    
+                    logger.info(f"Sending to frontend: Message {message_count}, Type: {message.get('type')}, Task: {task_id}")
+                    
+                    # 发送消息（使用换行符分隔）
+                    chunk = json.dumps(message) + '\n'
+                    yield chunk
+                    
+                    # 如果任务完成或失败，结束连接
+                    if (message.get('type') == 'task_update' and 
+                        message.get('data', {}).get('status') in ['completed', 'failed']):
+                        logger.info(f"Task {task_id} completed, sent {message_count} messages total")
                         break
-
+                        
                 except queue.Empty:
-                    # 发送心跳保持连接
-                    yield f"data: {json.dumps({'type': 'heartbeat', 'timestamp': time.time()})}\n\n"
+                    # 发送心跳
+                    heartbeat = json.dumps({'type': 'heartbeat', 'timestamp': time.time()}) + '\n'
+                    yield heartbeat
                     continue
-
+                    
         except Exception as e:
-            logger.error(f"Stream error for task {task_id}: {str(e)}")
-            yield f"data: {json.dumps({'type': 'error', 'message': 'Stream connection error'})}\n\n"
+            logger.error(f"Connection error for task {task_id}: {e}")
+            error_msg = json.dumps({'type': 'error', 'message': str(e)}) + '\n'
+            yield error_msg
         finally:
             # 清理资源
-            #if task_id in task_queues:
-                #del task_queues[task_id]
-            #if task_id in active_tasks:
-                #del active_tasks[task_id]
-            #if task_id in task_executors:
-                #del task_executors[task_id]
-            logger.info(f"Cleaned up resources for task {task_id}")
-
+            logger.info(f"Cleaning up resources for task {task_id}")
+            if task_id in task_queues:
+                del task_queues[task_id]
+            if task_id in task_executors:
+                del task_executors[task_id]
+            if task_id in active_tasks:
+                del active_tasks[task_id]
+    
     return Response(
-        generate(),
-        mimetype='text/event-stream',
+        generate_chunked_response(),
+        mimetype='text/plain',
         headers={
             'Cache-Control': 'no-cache',
             'Connection': 'keep-alive',
             'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'Cache-Control'
+            'Transfer-Encoding': 'chunked'
         }
     )
 
-
 @app.route('/api/tasks/<task_id>/pause', methods=['POST'])
 def pause_task(task_id):
-    """
-    暂停或恢复任务执行
-    """
+    """暂停或恢复任务执行"""
     if task_id not in task_executors:
         return jsonify({'error': 'Task not found'}), 404
 
@@ -837,14 +945,9 @@ def pause_task(task_id):
         'is_paused': executor.is_paused
     })
 
-
 @app.route('/api/tasks/<task_id>/export')
 def export_task(task_id):
-    """
-    导出任务的所有文件和执行记录
-
-    生成包含所有创建文件、执行日志和任务信息的ZIP文件
-    """
+    """导出任务的所有文件和执行记录"""
     if task_id not in task_executors:
         return jsonify({'error': 'Task not found'}), 404
 
@@ -868,7 +971,6 @@ def export_task(task_id):
         logger.error(f"Export failed for task {task_id}: {str(e)}")
         return jsonify({'error': 'Export failed'}), 500
 
-
 @app.route('/api/tasks/<task_id>')
 def get_task(task_id):
     """获取任务详细信息"""
@@ -877,24 +979,23 @@ def get_task(task_id):
 
     task_info = active_tasks[task_id].copy()
 
-    # 添加执行器状态信息
     if task_id in task_executors:
         executor = task_executors[task_id]
         task_info.update({
             'is_paused': executor.is_paused,
             'files_created': len(executor.all_files),
             'activities_count': len(executor.execution_log),
-            'file_structure': executor.file_structure
+            'file_structure': executor.file_structure,
+            'multimedia_support': True,
+            'real_urls': True
         })
 
     return jsonify(task_info)
-
 
 @app.route('/api/tasks')
 def list_tasks():
     """列出所有活跃任务"""
     return jsonify(list(active_tasks.values()))
-
 
 @app.route('/api/health')
 def health_check():
@@ -904,20 +1005,15 @@ def health_check():
         'active_tasks': len(active_tasks),
         'running_executors': len(task_executors),
         'timestamp': time.time(),
-        'version': '1.0.0'
+        'version': '2.1.0',
+        'communication_mode': 'POST + Chunked Transfer',
+        'features': ['real-multimedia', 'live-urls', 'post-streaming', 'reliable-messaging']
     })
-
 
 # ==================== 应用启动 ====================
 
 if __name__ == '__main__':
     logger.info("Starting Resear Pro AI Assistant Backend...")
-    logger.info("API endpoints:")
-    logger.info("  POST /api/tasks - Create new task")
-    logger.info("  GET  /api/tasks/<id>/stream - Stream task progress")
-    logger.info("  POST /api/tasks/<id>/pause - Pause/Resume task")
-    logger.info("  GET  /api/tasks/<id>/export - Export task files")
-    logger.info("  GET  /api/tasks/<id> - Get task info")
-    logger.info("  GET  /api/health - Health check")
-
+    logger.info("Features: Real multimedia URLs, 10-step execution, 3s intervals")
+    logger.info("Communication Mode: POST + Chunked Transfer (Reliable messaging)")
     app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)
