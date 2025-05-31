@@ -3,14 +3,13 @@
 import React, { useState, useEffect, Suspense, useRef, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
 import { DashboardContent } from "@/components/dashboard-content"
-import { ComputerView } from "@/components/computer-view" // Updated import
-import { Terminal, AlertCircle, GitBranch, Activity, CheckCircle2, XCircle, Pause, Play, ChevronLeft, ChevronRight, PanelLeftClose, PanelRightClose, Sparkles, Download, RotateCcw } from "lucide-react"
+import { ComputerView } from "@/components/computer-view"
+import { Terminal, AlertCircle, GitBranch, Activity, CheckCircle2, XCircle, Pause, Play, ChevronLeft, ChevronRight, PanelLeftClose, PanelRightClose, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useTaskStream, Activity as ApiActivity, FileStructureNode } from "@/lib/api"
 import { apiService } from "@/lib/api"
 import { useIsMobile } from "@/lib/hooks"
-import { EnhancedFileSystemManager } from '@/lib/file-system'
 
 // Define History Snapshot type
 interface HistorySnapshot {
@@ -61,40 +60,6 @@ function DashboardPageContent() {
 
   // useTaskStream hook
   const liveTaskState = useTaskStream(taskId);
-
-  // Enhanced file system management
-  const [sharedFileSystem, setSharedFileSystem] = useState<EnhancedFileSystemManager | null>(null)
-
-  // Initialize shared file system when taskId is available
-  useEffect(() => {
-    if (taskId && !sharedFileSystem) {
-      const fileSystemInstance = new EnhancedFileSystemManager(taskId)
-      setSharedFileSystem(fileSystemInstance)
-    }
-    
-    // Cleanup when component unmounts or taskId changes
-    return () => {
-      if (sharedFileSystem) {
-        sharedFileSystem.destroy()
-      }
-    }
-  }, [taskId, sharedFileSystem])
-
-  // 同步文件结构和内容到共享文件系统
-  useEffect(() => {
-    if (!sharedFileSystem || !liveTaskState.fileStructure) return
-
-    // 合并文件结构
-    sharedFileSystem.mergeExternalStructure(liveTaskState.fileStructure)
-  }, [sharedFileSystem, liveTaskState.fileStructure])
-
-  // 同步文件内容映射到共享文件系统
-  useEffect(() => {
-    if (!sharedFileSystem || liveTaskState.fileContentMap.size === 0) return
-
-    // 更新文件内容
-    sharedFileSystem.updateFileContentMap(liveTaskState.fileContentMap)
-  }, [sharedFileSystem, liveTaskState.fileContentMap])
 
   // Effect to merge liveTaskState.activities (AI) into displayedActivities
   useEffect(() => {
@@ -189,17 +154,21 @@ function DashboardPageContent() {
     }
   }, [history.length]);
 
-  // 处理文件树中的文件选择 - 简化逻辑
+  // 处理文件树中的文件选择
   const handleFileSelect = useCallback((filename: string) => {
-    console.log('File selected:', filename);
-    
-    // If we have content from live state, use it
-    if (liveTaskState.currentFile === filename && liveTaskState.fileContent) {
-      setSelectedFile({ filename, content: liveTaskState.fileContent });
-    } else {
-      // Otherwise just mark as selected, the ComputerView will handle opening
-      setSelectedFile({ filename, content: '' });
+    // 先尝试从API状态获取内容
+    let content = '';
+    if (liveTaskState.currentFile === filename) {
+      content = liveTaskState.fileContent || '';
     }
+    
+    // 设置选中的文件
+    setSelectedFile({ filename, content });
+    
+    console.log('File selected:', filename, 'Content length:', content.length);
+    
+    // 强制触发操作台中的文件打开逻辑
+    // 通过更新 displayState 来确保文件内容能正确传递
   }, [liveTaskState.currentFile, liveTaskState.fileContent]);
 
   // 添加跳转到指定活动的功能
@@ -280,6 +249,17 @@ function DashboardPageContent() {
         fileStructure: liveTaskState.fileStructure,
         timestamp: Date.now()
       };
+
+  // Diagnostic Log for displayState
+  useEffect(() => {
+    console.log("[DashboardPage] displayState updated:",
+      "Current File:", displayState.currentFile,
+      "File Content Length:", displayState.fileContent?.length,
+      "Is Viewing History:", isViewingHistory,
+      "History Index:", currentHistoryIndex,
+      "Activities Count:", displayState.activities.length
+      );
+  }, [displayState.currentFile, displayState.fileContent, isViewingHistory, currentHistoryIndex, displayState.activities.length]);
 
   const handlePause = async () => {
     if (!taskId) return
@@ -607,7 +587,6 @@ function DashboardPageContent() {
                         taskId={taskId}
                         activities={displayState.activities}
                         taskStartTime={getTaskStartTime()}
-                        sharedFileSystem={sharedFileSystem}
                       />
                     </div>
                   )}
@@ -637,7 +616,6 @@ function DashboardPageContent() {
                         taskId={taskId}
                         activities={displayState.activities}
                         taskStartTime={getTaskStartTime()}
-                        sharedFileSystem={sharedFileSystem}
                       />
                     </div>
                   )}

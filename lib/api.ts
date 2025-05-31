@@ -1,7 +1,10 @@
 // lib/api.ts
 import { useState, useEffect, useCallback } from 'react';
 
-const API_BASE_URL = 'http://ai-researcher.net:5000/api';
+// 可以通过环境变量或简单修改这里来切换后端
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+// 如果要使用简化版后端，取消注释下面这行：
+// const API_BASE_URL = 'http://localhost:5001/api';
 
 export interface Activity {
   id: number;
@@ -66,7 +69,25 @@ export class ApiService {
     return response.json();
   }
 
+  // 新的连接方法，使用POST模式
+  async connectTask(taskId: string): Promise<Response> {
+    const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/connect`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return response;
+  }
+
+  // 废弃的SSE方法（保留兼容性）
   streamTaskProgress(taskId: string): EventSource {
+    console.warn('streamTaskProgress is deprecated, use connectTask instead');
     const eventSource = new EventSource(`${API_BASE_URL}/tasks/${taskId}/stream`);
     return eventSource;
   }
@@ -200,23 +221,6 @@ export class ApiService {
     
     return response.json();
   }
-
-  async executeCommand(taskId: string, command: string): Promise<{ success: boolean; output?: string; command?: string }> {
-    const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/execute-command`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ command }),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || `Failed to execute command: ${response.statusText}`);
-    }
-    
-    return response.json();
-  }
 }
 
 export const apiService = new ApiService();
@@ -231,186 +235,178 @@ export interface UseTaskStreamResult {
   isConnected: boolean;
   terminalOutput: string[];
   fileStructure: FileStructureNode | null;
-  fileContentMap: Map<string, string>;
 }
 
 export function useTaskStream(taskId: string | null): UseTaskStreamResult {
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [currentFile, setCurrentFile] = useState('todo.md');
+  const [currentFile, setCurrentFile] = useState('');
   const [fileContent, setFileContent] = useState('');
   const [taskStatus, setTaskStatus] = useState('idle');
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [terminalOutput, setTerminalOutput] = useState<string[]>([]);
   const [fileStructure, setFileStructure] = useState<FileStructureNode | null>(null);
-  const [fileContentMap, setFileContentMap] = useState<Map<string, string>>(new Map());
 
-  const handleMessage = useCallback((event: MessageEvent) => {
-    try {
-      const message: StreamMessage = JSON.parse(event.data);
+  const handleMessage = useCallback((message: StreamMessage) => {
+    console.log('收到消息:', message.type, message);
 
-      switch (message.type) {
-        case 'activity':
-          setActivities(prev => [...prev, message.data as Activity]);
-          break;
+    switch (message.type) {
+      case 'activity':
+        setActivities(prev => [...prev, message.data as Activity]);
+        break;
 
-        case 'activity_update':
-          setActivities(prev => prev.map(activity =>
-            activity.id === message.data.id
-              ? { ...activity, status: message.data.status, ...message.data }
-              : activity
-          ));
-          break;
+      case 'activity_update':
+        setActivities(prev => prev.map(activity =>
+          activity.id === message.data.id
+            ? { ...activity, status: message.data.status, ...message.data }
+            : activity
+        ));
+        break;
 
-        case 'file_structure_update':
-          // 文件结构更新 - 创建空文件
-          const structureData = message.data as FileStructureNode;
-          setFileStructure(structureData);
-          
-          // 为新文件创建空内容映射，但不覆盖已有内容
-          setFileContentMap(prev => {
-            const newMap = new Map(prev);
-            
-            const processNode = (node: FileStructureNode, parentPath: string = '') => {
-              if (node.type === 'file') {
-                const fullPath = parentPath ? `${parentPath}/${node.name}` : node.name;
-                // 只为新文件设置空内容，不覆盖已存在的文件内容
-                if (!newMap.has(fullPath)) {
-                  newMap.set(fullPath, '');
-                }
-              } else if (node.children) {
-                const currentPath = parentPath ? `${parentPath}/${node.name}` : node.name;
-                node.children.forEach(child => processNode(child, currentPath));
-              }
-            };
-            
-            if (structureData.children) {
-              structureData.children.forEach(child => processNode(child));
-            }
-            
-            return newMap;
-          });
-          break;
+      case 'file_update':
+        const fileUpdate = message.data as FileUpdate;
+        setCurrentFile(fileUpdate.filename);
+        setFileContent(fileUpdate.content);
+        break;
 
-        case 'file_update':
-          // 文件内容更新
-          const fileUpdate = message.data as FileUpdate;
-          setFileContentMap(prev => {
-            const newMap = new Map(prev);
-            newMap.set(fileUpdate.filename, fileUpdate.content);
-            return newMap;
-          });
-          
-          // 如果更新的是当前打开的文件，也更新currentFile和fileContent
-          setCurrentFile(fileUpdate.filename);
-          setFileContent(fileUpdate.content);
-          break;
+      case 'file_structure_update':
+        setFileStructure(message.data as FileStructureNode);
+        break;
 
-        case 'task_update':
-          setTaskStatus(message.data.status);
-          if (message.data.error) {
-            setError(message.data.error);
-          }
-          break;
+      case 'task_update':
+        setTaskStatus(message.data.status);
+        if (message.data.error) {
+          setError(message.data.error);
+        }
+        break;
 
-        case 'terminal':
-          setTerminalOutput(prev => [
-            ...prev,
-            `$ ${message.data.command}`,
-            message.data.output
-          ]);
-          break;
+      case 'terminal':
+        setTerminalOutput(prev => [
+          ...prev,
+          `$ ${message.data.command}`,
+          message.data.output
+        ]);
+        break;
 
-        case 'connection_close':
-          // 服务器主动关闭连接，这是正常的
-          console.log(`Connection closed: ${message.reason}`);
-          setIsConnected(false);
-          // 不设置错误状态，因为这是预期的行为
-          break;
+      case 'heartbeat':
+        // 保持连接活跃，重置错误状态
+        setError(null);
+        break;
 
-        case 'heartbeat':
-          // 保持连接活跃，重置错误状态
-          setError(null);
-          break;
+      case 'error':
+        setError(message.message || '未知错误');
+        setIsConnected(false);
+        break;
 
-        default:
-          console.log('Unknown message type:', message.type);
-      }
-    } catch (err) {
-      console.error('Error parsing SSE message:', err);
-      setError('消息解析错误');
+      default:
+        console.log('未知消息类型:', message.type);
     }
   }, []);
 
   useEffect(() => {
     if (!taskId) return;
 
-    let eventSource: EventSource | null = null;
-    let reconnectTimer: NodeJS.Timeout | null = null;
+    let abortController: AbortController | null = null;
+    let isProcessing = false;
 
-    const connect = () => {
+    const connectAndStream = async () => {
+      if (isProcessing) return;
+      isProcessing = true;
+
       try {
-        eventSource = apiService.streamTaskProgress(taskId);
+        console.log('开始连接任务:', taskId);
+        setIsConnected(true);
+        setError(null);
 
-        eventSource.onopen = () => {
-          console.log('SSE connection opened');
-          setIsConnected(true);
-          setError(null);
-        };
+        abortController = new AbortController();
+        
+        const response = await apiService.connectTask(taskId);
+        
+        if (!response.body) {
+          throw new Error('Response body is null');
+        }
 
-        eventSource.onmessage = handleMessage;
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let messageCount = 0;
 
-        eventSource.onerror = (event) => {
-          console.log('SSE connection error or close');
-          setIsConnected(false);
-
-          // 检查当前任务状态，如果已完成则不显示错误
-          if (taskStatus === 'completed' || taskStatus === 'failed') {
-            console.log('Task completed, connection closed normally');
-            return;
+        while (true) {
+          const { value, done } = await reader.read();
+          
+          if (done) {
+            console.log('连接结束，总共处理了', messageCount, '条消息');
+            break;
           }
 
-          // 只有在任务仍在运行时才显示连接错误
-          if (taskStatus === 'started') {
-            setError('连接中断，正在尝试重连...');
+          // 解码数据块
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
 
-            // 尝试重连（最多3次）
-            if (!reconnectTimer) {
-              reconnectTimer = setTimeout(() => {
-                console.log('Attempting to reconnect...');
-                connect();
-                reconnectTimer = null;
-              }, 3000);
+          // 按行分割消息
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // 保留最后一个不完整的行
+
+          // 处理完整的消息行
+          for (const line of lines) {
+            if (line.trim()) {
+              try {
+                const message: StreamMessage = JSON.parse(line);
+                messageCount++;
+                console.log(`处理消息 ${messageCount}:`, message.type);
+                handleMessage(message);
+
+                // 检查任务是否完成
+                if (message.type === 'task_update' && 
+                    message.data?.status && 
+                    ['completed', 'failed'].includes(message.data.status)) {
+                  console.log('任务完成，状态:', message.data.status);
+                  setIsConnected(false);
+                  return;
+                }
+              } catch (parseError) {
+                console.error('解析消息失败:', parseError, '原始内容:', line);
+              }
             }
           }
-        };
+        }
 
-      } catch (err) {
-        console.error('Error creating SSE connection:', err);
-        setError('无法连接到服务器');
+      } catch (fetchError: any) {
+        console.error('连接错误:', fetchError);
+        
+        if (fetchError.name === 'AbortError') {
+          console.log('连接被主动中断');
+          return;
+        }
+
+        // 只有在任务仍在运行时才显示错误
+        if (taskStatus !== 'completed' && taskStatus !== 'failed') {
+          setError('连接失败: ' + fetchError.message);
+        }
+        setIsConnected(false);
+      } finally {
+        isProcessing = false;
       }
     };
 
-    connect();
+    // 启动连接
+    connectAndStream();
 
+    // 清理函数
     return () => {
-      if (eventSource) {
-        eventSource.close();
-        setIsConnected(false);
+      if (abortController) {
+        console.log('中断连接');
+        abortController.abort();
       }
-      if (reconnectTimer) {
-        clearTimeout(reconnectTimer);
-      }
+      setIsConnected(false);
     };
   }, [taskId, handleMessage, taskStatus]);
 
   // 任务完成后清理状态
   useEffect(() => {
     if (taskStatus === 'completed' || taskStatus === 'failed') {
-      // 任务完成，清除错误状态
       setError(null);
-
-      // 延迟1秒后设置连接状态为false，给用户看到完成状态的时间
+      
       const timer = setTimeout(() => {
         setIsConnected(false);
       }, 1000);
@@ -427,7 +423,6 @@ export function useTaskStream(taskId: string | null): UseTaskStreamResult {
     error,
     isConnected,
     terminalOutput,
-    fileStructure,
-    fileContentMap
+    fileStructure
   };
 }
