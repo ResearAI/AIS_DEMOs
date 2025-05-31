@@ -1401,6 +1401,105 @@ def get_file_structure(task_id):
         return jsonify({'error': 'Failed to get file structure'}), 500
 
 
+@app.route('/api/tasks/<task_id>/execute-command', methods=['POST'])
+def execute_command(task_id):
+    """
+    执行终端命令
+    """
+    if task_id not in task_executors:
+        return jsonify({'error': 'Task not found'}), 404
+
+    try:
+        data = request.get_json()
+        if not data or 'command' not in data:
+            return jsonify({'error': 'Missing command'}), 400
+
+        command = data['command']
+        executor = task_executors[task_id]
+        
+        # 模拟命令执行输出
+        if command == 'clear':
+            output = ''  # Clear命令没有输出
+        elif command.startswith('cd '):
+            path = command[3:].strip()
+            output = f'Changed directory to {path}'
+        elif command == 'ls' or command == 'dir':
+            # 列出当前任务的文件
+            files = list(executor.all_files.keys())
+            if files:
+                output = '\n'.join(files)
+            else:
+                output = 'No files found'
+        elif command == 'pwd':
+            output = f'/workspace/task-{task_id}'
+        elif command.startswith('echo '):
+            message = command[5:].strip()
+            output = message
+        elif command == 'date':
+            output = time.strftime('%Y-%m-%d %H:%M:%S')
+        elif command == 'whoami':
+            output = 'resear-pro-ai'
+        elif command.startswith('cat '):
+            filename = command[4:].strip()
+            if filename in executor.all_files:
+                output = executor.all_files[filename]
+            else:
+                output = f'cat: {filename}: No such file or directory'
+        elif command.startswith('touch '):
+            filename = command[6:].strip()
+            if filename not in executor.all_files:
+                executor.all_files[filename] = ''
+                executor.emit_file_update(filename, '')
+                output = f'Created file: {filename}'
+            else:
+                output = f'File already exists: {filename}'
+        elif command.startswith('mkdir '):
+            dirname = command[6:].strip()
+            output = f'Created directory: {dirname}'
+        elif command == 'help':
+            output = """Available commands:
+ls, dir      - List files
+pwd          - Show current directory
+cd <path>    - Change directory
+echo <text>  - Display text
+date         - Show current date/time
+whoami       - Show current user
+cat <file>   - Display file contents
+touch <file> - Create empty file
+mkdir <dir>  - Create directory
+clear        - Clear terminal
+help         - Show this help"""
+        else:
+            output = f"""Command '{command}' executed successfully.
+This is a simulated terminal environment.
+Available commands: ls, pwd, cd, echo, date, whoami, cat, touch, mkdir, clear, help
+Output: Mock execution result for '{command}'"""
+
+        # 记录命令执行活动
+        executor.emit_activity(
+            "terminal", 
+            f"Executed: {command}",
+            command=command,
+            output=output,
+            status="completed"
+        )
+        
+        # 发送终端输出
+        executor.emit_terminal_output(command, output)
+        
+        logger.info(f"Command executed for task {task_id}: {command}")
+        
+        return jsonify({
+            'success': True,
+            'command': command,
+            'output': output
+        })
+
+    except Exception as e:
+        logger.error(f"Error executing command for task {task_id}: {str(e)}")
+        return jsonify({'error': 'Failed to execute command'}), 500
+
+
 @app.route('/api/tasks/<task_id>/send-message', methods=['POST'])
 def send_user_message(task_id):
     """

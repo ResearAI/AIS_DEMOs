@@ -200,6 +200,23 @@ export class ApiService {
     
     return response.json();
   }
+
+  async executeCommand(taskId: string, command: string): Promise<{ success: boolean; output?: string; command?: string }> {
+    const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/execute-command`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ command }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Failed to execute command: ${response.statusText}`);
+    }
+    
+    return response.json();
+  }
 }
 
 export const apiService = new ApiService();
@@ -214,6 +231,7 @@ export interface UseTaskStreamResult {
   isConnected: boolean;
   terminalOutput: string[];
   fileStructure: FileStructureNode | null;
+  fileContentMap: Map<string, string>;
 }
 
 export function useTaskStream(taskId: string | null): UseTaskStreamResult {
@@ -225,6 +243,7 @@ export function useTaskStream(taskId: string | null): UseTaskStreamResult {
   const [isConnected, setIsConnected] = useState(false);
   const [terminalOutput, setTerminalOutput] = useState<string[]>([]);
   const [fileStructure, setFileStructure] = useState<FileStructureNode | null>(null);
+  const [fileContentMap, setFileContentMap] = useState<Map<string, string>>(new Map());
 
   const handleMessage = useCallback((event: MessageEvent) => {
     try {
@@ -243,14 +262,48 @@ export function useTaskStream(taskId: string | null): UseTaskStreamResult {
           ));
           break;
 
-        case 'file_update':
-          const fileUpdate = message.data as FileUpdate;
-          setCurrentFile(fileUpdate.filename);
-          setFileContent(fileUpdate.content);
+        case 'file_structure_update':
+          // 文件结构更新 - 创建空文件
+          const structureData = message.data as FileStructureNode;
+          setFileStructure(structureData);
+          
+          // 为新文件创建空内容映射，但不覆盖已有内容
+          setFileContentMap(prev => {
+            const newMap = new Map(prev);
+            
+            const processNode = (node: FileStructureNode, parentPath: string = '') => {
+              if (node.type === 'file') {
+                const fullPath = parentPath ? `${parentPath}/${node.name}` : node.name;
+                // 只为新文件设置空内容，不覆盖已存在的文件内容
+                if (!newMap.has(fullPath)) {
+                  newMap.set(fullPath, '');
+                }
+              } else if (node.children) {
+                const currentPath = parentPath ? `${parentPath}/${node.name}` : node.name;
+                node.children.forEach(child => processNode(child, currentPath));
+              }
+            };
+            
+            if (structureData.children) {
+              structureData.children.forEach(child => processNode(child));
+            }
+            
+            return newMap;
+          });
           break;
 
-        case 'file_structure_update':
-          setFileStructure(message.data as FileStructureNode);
+        case 'file_update':
+          // 文件内容更新
+          const fileUpdate = message.data as FileUpdate;
+          setFileContentMap(prev => {
+            const newMap = new Map(prev);
+            newMap.set(fileUpdate.filename, fileUpdate.content);
+            return newMap;
+          });
+          
+          // 如果更新的是当前打开的文件，也更新currentFile和fileContent
+          setCurrentFile(fileUpdate.filename);
+          setFileContent(fileUpdate.content);
           break;
 
         case 'task_update':
@@ -374,6 +427,7 @@ export function useTaskStream(taskId: string | null): UseTaskStreamResult {
     error,
     isConnected,
     terminalOutput,
-    fileStructure
+    fileStructure,
+    fileContentMap
   };
 }
